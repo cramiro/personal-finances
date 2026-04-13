@@ -82,11 +82,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isAuthenticated: true, isLoading: false,
     });
 
-    // Fire-and-forget: update last seen info for current member
-    updateLastSeen(member.id);
+    // Update last seen info, then refresh members list so UI shows current data
+    updateLastSeen(member.id, member.workspace_id);
   }
 
-  async function updateLastSeen(memberId: string) {
+  async function updateLastSeen(memberId: string, workspaceId: string) {
     try {
       const device = parseDevice(navigator.userAgent);
       let location = 'Desconocida';
@@ -97,11 +97,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (json.status === 'success') location = `${json.city}, ${json.country}`;
         }
       } catch { /* ignore geo errors */ }
-      await supabase.from('members').update({
-        last_seen_at: new Date().toISOString(),
+      const now = new Date().toISOString();
+      const { error } = await supabase.from('members').update({
+        last_seen_at: now,
         last_device: device,
         last_location: location,
       }).eq('id', memberId);
+      if (error) return;
+      // Refresh members in state so UI reflects updated values immediately
+      const { data: mems } = await supabase.from('members').select('*').eq('workspace_id', workspaceId);
+      setState(s => ({ ...s, members: mems ?? [], currentMember: mems?.find(m => m.id === memberId) ?? s.currentMember }));
     } catch { /* ignore */ }
   }
 
