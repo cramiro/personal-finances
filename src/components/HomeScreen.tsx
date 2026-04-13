@@ -15,6 +15,7 @@ export default function HomeScreen() {
   const [savedMsg, setSavedMsg] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [showRecents, setShowRecents] = useState(false);
 
   const parsed = parseExpense(input, categories, workspace?.default_currency ?? 'ARS');
   const hasInput = input.trim().length > 0;
@@ -113,8 +114,13 @@ export default function HomeScreen() {
         </button>
       </form>
 
-      <p className="section-label">Recientes</p>
-      <div className="expense-list">
+      <button className="section-toggle" onClick={() => setShowRecents(v => !v)}>
+        <span className="section-label">Recientes</span>
+        <svg className={`chevron ${showRecents ? 'chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <div className={`expense-list ${showRecents ? '' : 'expense-list--hidden'}`}>
         {recents.length === 0 && <p className="empty">Cargá tu primer gasto</p>}
         {recents.map(e => {
           const cat = e.categories as any;
@@ -169,8 +175,12 @@ export default function HomeScreen() {
         .member-badge { background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 6px; }
         .confirm-btn { margin-top: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 700; transition: opacity 0.15s; width: 100%; cursor: pointer; }
         .confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.5px; text-transform: uppercase; margin: 4px 0 0; }
+        .section-toggle { display: flex; align-items: center; justify-content: space-between; background: none; border: none; padding: 4px 0; cursor: pointer; width: 100%; }
+        .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); letter-spacing: 0.5px; text-transform: uppercase; }
+        .chevron { color: var(--text-tertiary); transition: transform 0.2s; flex-shrink: 0; }
+        .chevron--up { transform: rotate(180deg); }
         .expense-list { display: flex; flex-direction: column; gap: 2px; }
+        .expense-list--hidden { display: none; }
         .expense-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 10px; padding: 12px; }
         .exp-info { flex: 1; overflow: hidden; }
         .exp-desc { display: block; font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
