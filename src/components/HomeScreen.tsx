@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import { parseExpense, formatAmount } from '@/lib/parser';
 import { supabase } from '@/lib/supabase';
+import { getDailyRate } from '@/lib/blueRate';
+import type { Currency } from '@/types';
 import { Expense, Category } from '@/types';
 
 export default function HomeScreen() {
@@ -42,11 +44,17 @@ export default function HomeScreen() {
     e.preventDefault();
     if (!workspace || !currentMember || parsed.amount <= 0) return;
     setSaving(true);
+    const today = new Date().toISOString().slice(0, 10);
+    const rate = await getDailyRate(today);
+    const amount_ars = parsed.currency === 'ARS' ? parsed.amount : parsed.amount * rate;
+    const amount_usd = parsed.currency === 'USD' ? parsed.amount : parsed.amount / rate;
     const { error } = await supabase.from('expenses').insert({
       workspace_id: workspace.id,
       member_id: currentMember.id,
       amount: parsed.amount,
       currency: parsed.currency,
+      amount_ars: Math.round(amount_ars),
+      amount_usd: Math.round(amount_usd * 100) / 100,
       description: parsed.description || input,
       category_id: parsed.categoryId,
       date: new Date().toISOString(),
@@ -190,18 +198,24 @@ function EditModal({ expense, categories, onClose, onSaved }: {
   const [amount, setAmount] = useState(String(expense.amount));
   const [description, setDescription] = useState(expense.description);
   const [categoryId, setCategoryId] = useState(expense.category_id);
-  const [currency, setCurrency] = useState(expense.currency);
+  const [currency, setCurrency] = useState<Currency>(expense.currency);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     const num = parseFloat(amount.replace(',', '.'));
     if (!num || num <= 0) return;
     setSaving(true);
+    const dateStr = expense.date.slice(0, 10);
+    const rate = await getDailyRate(dateStr);
+    const amount_ars = currency === 'ARS' ? num : Math.round(num * rate);
+    const amount_usd = currency === 'USD' ? num : Math.round(num / rate * 100) / 100;
     await supabase.from('expenses').update({
       amount: num,
       description: description.trim(),
       category_id: categoryId,
       currency,
+      amount_ars,
+      amount_usd,
     }).eq('id', expense.id);
     setSaving(false);
     onSaved();

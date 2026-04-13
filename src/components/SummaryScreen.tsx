@@ -27,6 +27,7 @@ export default function SummaryScreen() {
   const [loading, setLoading] = useState(false);
   const [showUSD, setShowUSD] = useState(false);
   const [memberId, setMemberId] = useState<string | null>(null);
+  const [drillCat, setDrillCat] = useState<{id: string; name: string; color: string} | null>(null);
 
   const load = useCallback(async () => {
     if (!workspace) return;
@@ -50,14 +51,19 @@ export default function SummaryScreen() {
 
   useEffect(() => { load(); refreshBlueRate(); }, [load]);
 
-  function toDisplay(amount: number, cur: Currency) {
+  function toDisplay(e: { amount: number; currency: Currency; amount_ars: number | null; amount_usd: number | null }) {
+    if (!showUSD) {
+      if (e.amount_ars != null) return e.amount_ars;
+      const rate = blueRate?.venta ?? 1400;
+      return e.currency === 'USD' ? e.amount * rate : e.amount;
+    }
+    if (e.amount_usd != null) return e.amount_usd;
     const rate = blueRate?.venta ?? 1400;
-    if (!showUSD) return cur === 'USD' ? amount * rate : amount;
-    return cur === 'ARS' ? amount / rate : amount;
+    return e.currency === 'ARS' ? e.amount / rate : e.amount;
   }
 
   const displayCur: Currency = showUSD ? 'USD' : 'ARS';
-  const total = expenses.reduce((s, e) => s + toDisplay(e.amount, e.currency), 0);
+  const total = expenses.reduce((s, e) => s + toDisplay(e), 0);
 
   // Monthly chart
   const range: string[] = [];
@@ -67,7 +73,7 @@ export default function SummaryScreen() {
   while (y<ey||(y===ey&&m<=em)) { range.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
 
   const chartData = range.map(mo => {
-    const sum = expenses.filter(e => e.date.startsWith(mo)).reduce((s,e) => s+toDisplay(e.amount,e.currency),0);
+    const sum = expenses.filter(e => e.date.startsWith(mo)).reduce((s,e) => s+toDisplay(e),0);
     const label = new Date(`${mo}-01`).toLocaleString('es-AR',{month:'short'}).replace('.','');
     return { month: label, total: Math.round(sum) };
   });
@@ -77,7 +83,7 @@ export default function SummaryScreen() {
   expenses.forEach(e => {
     const cat = e.categories as any;
     if (!catMap[e.category_id]) catMap[e.category_id] = { name: cat?.name??'Otros', color: cat?.color??'#888', total: 0 };
-    catMap[e.category_id].total += toDisplay(e.amount, e.currency);
+    catMap[e.category_id].total += toDisplay(e);
   });
   const breakdown = Object.values(catMap).sort((a,b)=>b.total-a.total);
 
@@ -135,17 +141,32 @@ export default function SummaryScreen() {
           {breakdown.length > 0 && (
             <div className="section">
               <p className="section-label">Por categoría</p>
-              {breakdown.map((c,i) => (
-                <div key={i} className="cat-row">
-                  <span className="cat-dot" style={{background:c.color}} />
-                  <span className="cat-name">{c.name}</span>
-                  <div className="bar-bg">
-                    <div className="bar-fill" style={{width:`${Math.min(100,(c.total/total)*100)}%`,background:c.color}} />
-                  </div>
-                  <span className="cat-amount">{formatAmount(c.total,displayCur)}</span>
-                </div>
-              ))}
+              {breakdown.map((c,i) => {
+                const catId = Object.keys(catMap).find(k => catMap[k] === c) ?? '';
+                return (
+                  <button key={i} className="cat-row cat-row--btn" onClick={() => setDrillCat({id: catId, name: c.name, color: c.color})}>
+                    <span className="cat-dot" style={{background:c.color}} />
+                    <span className="cat-name">{c.name}</span>
+                    <div className="bar-bg">
+                      <div className="bar-fill" style={{width:`${Math.min(100,(c.total/total)*100)}%`,background:c.color}} />
+                    </div>
+                    <span className="cat-amount">{formatAmount(c.total,displayCur)}</span>
+                  </button>
+                );
+              })}
             </div>
+          )}
+
+          {drillCat && (
+            <DrillModal
+              catId={drillCat.id}
+              catName={drillCat.name}
+              catColor={drillCat.color}
+              expenses={expenses}
+              toDisplay={toDisplay}
+              displayCur={displayCur}
+              onClose={() => setDrillCat(null)}
+            />
           )}
 
           {expenses.length === 0 && <p className="empty">Sin gastos en este período</p>}
@@ -169,12 +190,74 @@ export default function SummaryScreen() {
         .section { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
         .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px; }
         .cat-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .cat-row--btn { width: 100%; border: none; background: none; padding: 0; cursor: pointer; text-align: left; border-radius: 8px; transition: background 0.1s; }
+        .cat-row--btn:hover { background: var(--bg); }
         .cat-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
         .cat-name { width: 100px; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bar-bg { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
         .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
         .cat-amount { font-size: 13px; font-weight: 700; color: var(--text); min-width: 80px; text-align: right; }
         .empty { text-align: center; color: var(--text-tertiary); padding: 40px 0; margin: 0; }
+      `}</style>
+    </div>
+  );
+}
+
+function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur, onClose }: {
+  catId: string;
+  catName: string;
+  catColor: string;
+  expenses: Expense[];
+  toDisplay: (e: Expense) => number;
+  displayCur: Currency;
+  onClose: () => void;
+}) {
+  const items = expenses
+    .filter(e => e.category_id === catId)
+    .sort((a, b) => toDisplay(b) - toDisplay(a));
+
+  function fmtDate(d: string) {
+    return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  }
+
+  return (
+    <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <div className="modal-header">
+          <span className="cat-dot" style={{background: catColor}} />
+          <h3 className="modal-title">{catName}</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-list">
+          {items.map(e => {
+            const mem = e.members as any;
+            return (
+              <div key={e.id} className="item-row">
+                <div className="item-info">
+                  <span className="item-desc">{e.description}</span>
+                  <span className="item-meta">{mem?.display_name} · {fmtDate(e.date)}</span>
+                </div>
+                <span className="item-amount">{formatAmount(toDisplay(e), displayCur)}</span>
+              </div>
+            );
+          })}
+          {items.length === 0 && <p className="empty">Sin gastos</p>}
+        </div>
+      </div>
+      <style jsx>{`
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: flex-end; justify-content: center; z-index: 200; }
+        .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 20px; width: 100%; max-width: 480px; max-height: 80dvh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+        .cat-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .modal-title { flex: 1; font-size: 18px; font-weight: 700; margin: 0; }
+        .close-btn { border: none; background: none; font-size: 18px; color: var(--text-tertiary); padding: 4px; cursor: pointer; }
+        .modal-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+        .item-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--border); }
+        .item-info { flex: 1; overflow: hidden; }
+        .item-desc { display: block; font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-meta { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .item-amount { font-size: 14px; font-weight: 700; color: var(--text); flex-shrink: 0; }
+        .empty { color: var(--text-tertiary); font-size: 14px; text-align: center; padding: 24px 0; margin: 0; }
       `}</style>
     </div>
   );

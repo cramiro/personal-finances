@@ -34,6 +34,8 @@ export interface Expense {
   member_id: string;
   amount: number;
   currency: Currency;
+  amount_ars: number | null;
+  amount_usd: number | null;
   description: string;
   category_id: string;
   date: string;

@@ -1,4 +1,5 @@
 import { BlueRate } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 const CACHE_KEY = 'gastly_blue_rate';
 const FALLBACK = 1400;
@@ -18,4 +19,25 @@ export async function getBlueRate(): Promise<BlueRate> {
     }
     return { compra: FALLBACK, venta: FALLBACK, fetchedAt: new Date().toISOString() };
   }
+}
+
+// Returns the blue sell rate for a given date (YYYY-MM-DD).
+// Checks daily_rates table first; if missing, fetches from API and persists it.
+export async function getDailyRate(dateStr: string): Promise<number> {
+  const { data } = await supabase
+    .from('daily_rates')
+    .select('blue_sell')
+    .eq('date', dateStr)
+    .maybeSingle();
+
+  if (data) return Number(data.blue_sell);
+
+  const rate = await getBlueRate();
+  const sell = rate.venta;
+
+  await supabase
+    .from('daily_rates')
+    .upsert({ date: dateStr, blue_sell: sell }, { onConflict: 'date' });
+
+  return sell;
 }
