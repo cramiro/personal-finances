@@ -78,7 +78,7 @@ export default function SummaryScreen() {
 
   const chartData = range.map(mo => {
     const sum = expenses.filter(e => e.date.startsWith(mo)).reduce((s,e) => s+toDisplay(e),0);
-    const label = new Date(`${mo}-01`).toLocaleString('es-AR',{month:'short'}).replace('.','');
+    const label = new Date(`${mo}-02T12:00:00Z`).toLocaleString('es-AR',{month:'short'}).replace('.','');
     return { monthKey: mo, month: label, total: Math.round(sum) };
   });
 
