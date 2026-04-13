@@ -235,7 +235,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function refreshBlueRate() {
     const blue = await getBlueRate();
-    setState(s => ({ ...s, blueRate: blue }));
+    setState(s => {
+      if (s.blueRate?.venta === blue.venta && s.blueRate?.compra === blue.compra) return s;
+      return { ...s, blueRate: blue };
+    });
   }
 
   return (

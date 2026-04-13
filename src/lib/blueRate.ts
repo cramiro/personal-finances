@@ -5,8 +5,16 @@ const CACHE_KEY = 'gastly_blue_rate';
 const FALLBACK = 1400;
 
 export async function getBlueRate(): Promise<BlueRate> {
+  // Cache-first: return localStorage value if fresher than 5 minutes
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached) as BlueRate;
+      if (Date.now() - new Date(parsed.fetchedAt).getTime() < 300_000) return parsed;
+    }
+  }
   try {
-    const res = await fetch('https://dolarapi.com/v1/dolares/blue', { next: { revalidate: 300 } });
+    const res = await fetch('https://dolarapi.com/v1/dolares/blue');
     if (!res.ok) throw new Error('api error');
     const json = await res.json();
     const rate: BlueRate = { compra: json.compra, venta: json.venta, fetchedAt: new Date().toISOString() };

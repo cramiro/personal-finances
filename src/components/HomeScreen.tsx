@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { parseExpense, formatAmount } from '@/lib/parser';
 import { supabase } from '@/lib/supabase';
@@ -16,7 +16,10 @@ export default function HomeScreen() {
   const [selected, setSelected] = useState<Expense | null>(null);
   const [showRecents, setShowRecents] = useState(false);
 
-  const parsed = parseExpense(input, categories, workspace?.default_currency ?? 'ARS');
+  const parsed = useMemo(
+    () => parseExpense(input, categories, workspace?.default_currency ?? 'ARS'),
+    [input, categories, workspace?.default_currency]
+  );
   const hasInput = input.trim().length > 0;
   const isOwner = currentMember?.role === 'owner';
 

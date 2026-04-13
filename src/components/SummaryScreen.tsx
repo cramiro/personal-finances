@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
@@ -19,6 +19,7 @@ function getMonths() {
   return out;
 }
 const MONTHS = getMonths();
+const BAR_MARGIN = { top: 4, right: 4, bottom: 0, left: 0 };
 
 export default function SummaryScreen() {
   const { workspace, members, categories, currentMember, blueRate, refreshBlueRate } = useApp();
@@ -52,7 +53,12 @@ export default function SummaryScreen() {
     setLoading(false);
   }, [workspace, from, to, memberId]);
 
-  useEffect(() => { load(); refreshBlueRate(); }, [load]);
+  useEffect(() => {
+    load();
+    if (!blueRate || Date.now() - new Date(blueRate.fetchedAt).getTime() > 300_000) {
+      refreshBlueRate();
+    }
+  }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toDisplay(e: { amount: number; currency: Currency; amount_ars: number | null; amount_usd: number | null }) {
     if (!showUSD) {
@@ -66,36 +72,68 @@ export default function SummaryScreen() {
   }
 
   const displayCur: Currency = showUSD ? 'USD' : 'ARS';
-  const total = expenses.reduce((s, e) => s + toDisplay(e), 0);
 
-  // Monthly chart
-  const range: string[] = [];
-  const s = from < to ? from : to, en = from < to ? to : from;
-  const [sy,sm] = s.split('-').map(Number), [ey,em] = en.split('-').map(Number);
-  let y=sy, m=sm;
-  while (y<ey||(y===ey&&m<=em)) { range.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
+  // Pre-compute display amount per expense once — avoids O(n×3) calls per render
+  const displayAmounts = useMemo(() => {
+    const rate = blueRate?.venta ?? 1400;
+    const map = new Map<string, number>();
+    expenses.forEach(e => {
+      if (!showUSD) {
+        map.set(e.id, e.amount_ars != null ? e.amount_ars : e.currency === 'USD' ? e.amount * rate : e.amount);
+      } else {
+        map.set(e.id, e.amount_usd != null ? e.amount_usd : e.currency === 'ARS' ? e.amount / rate : e.amount);
+      }
+    });
+    return map;
+  }, [expenses, showUSD, blueRate?.venta]);
 
-  // Reset selectedMonth when range changes
+  const total = useMemo(
+    () => expenses.reduce((s, e) => s + (displayAmounts.get(e.id) ?? 0), 0),
+    [expenses, displayAmounts]
+  );
+
+  // Monthly chart range
+  const range = useMemo(() => {
+    const out: string[] = [];
+    const s = from < to ? from : to, en = from < to ? to : from;
+    const [sy, sm] = s.split('-').map(Number), [ey, em] = en.split('-').map(Number);
+    let y = sy, m = sm;
+    while (y < ey || (y === ey && m <= em)) {
+      out.push(`${y}-${String(m).padStart(2, '0')}`);
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return out;
+  }, [from, to]);
+
+  // Reset selectedMonth when range/member changes
   useEffect(() => { setSelectedMonth(null); }, [from, to, memberId]);
 
-  const chartData = range.map(mo => {
-    const sum = expenses.filter(e => e.date.startsWith(mo)).reduce((s,e) => s+toDisplay(e),0);
-    const label = new Date(`${mo}-02T12:00:00Z`).toLocaleString('es-AR',{month:'short'}).replace('.','');
-    return { monthKey: mo, month: label, total: Math.round(sum) };
-  });
+  // Single-pass chart data — O(n) instead of O(n×months)
+  const chartData = useMemo(() => {
+    const monthTotals: Record<string, number> = {};
+    expenses.forEach(e => {
+      const mo = e.date.slice(0, 7);
+      monthTotals[mo] = (monthTotals[mo] ?? 0) + (displayAmounts.get(e.id) ?? 0);
+    });
+    return range.map(mo => ({
+      monthKey: mo,
+      month: new Date(`${mo}-02T12:00:00Z`).toLocaleString('es-AR', { month: 'short' }).replace('.', ''),
+      total: Math.round(monthTotals[mo] ?? 0),
+    }));
+  }, [expenses, displayAmounts, range]);
 
-  // Category breakdown — filtered by selectedMonth if set
-  const catExpenses = selectedMonth ? expenses.filter(e => e.date.startsWith(selectedMonth)) : expenses;
-  const catMap: Record<string,{name:string;color:string;total:number}> = {};
-  catExpenses.forEach(e => {
-    const cat = e.categories as any;
-    const key = e.category_id ?? '__null__';
-    const name = cat?.name ?? 'Sin categoría';
-    const color = cat?.color ?? '#888780';
-    if (!catMap[key]) catMap[key] = { name, color, total: 0 };
-    catMap[key].total += toDisplay(e);
-  });
-  const breakdown = Object.values(catMap).sort((a,b)=>b.total-a.total);
+  // Category breakdown — key included to avoid reverse-lookup in render
+  const breakdown = useMemo(() => {
+    const src = selectedMonth ? expenses.filter(e => e.date.startsWith(selectedMonth)) : expenses;
+    const catMap: Record<string, { name: string; color: string; total: number; key: string }> = {};
+    src.forEach(e => {
+      const cat = e.categories as any;
+      const key = e.category_id ?? '__null__';
+      if (!catMap[key]) catMap[key] = { name: cat?.name ?? 'Sin categoría', color: cat?.color ?? '#888780', total: 0, key };
+      catMap[key].total += displayAmounts.get(e.id) ?? 0;
+    });
+    return Object.values(catMap).sort((a, b) => b.total - a.total);
+  }, [expenses, selectedMonth, displayAmounts]);
 
   const catPeriodLabel = selectedMonth
     ? new Date(`${selectedMonth}-01`).toLocaleString('es-AR', { month: 'long', year: '2-digit' }).replace('.','')
@@ -139,7 +177,7 @@ export default function SummaryScreen() {
             <div className="chart-card">
               <p className="section-label">Por mes</p>
               <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={chartData} margin={{top:4,right:4,bottom:0,left:0}} style={{cursor:'pointer'}}>
+                <BarChart data={chartData} margin={BAR_MARGIN} style={{cursor:'pointer'}}>
                   <XAxis dataKey="month" tick={{fontSize:12,fill:'#6B6B6B'}} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip
@@ -181,8 +219,7 @@ export default function SummaryScreen() {
                 }
               </div>
               {breakdown.map((c,i) => {
-                const catKey = Object.keys(catMap).find(k => catMap[k] === c) ?? '';
-                const catId = catKey === '__null__' ? '' : catKey;
+                const catId = c.key === '__null__' ? '' : c.key;
                 return (
                   <button key={i} className="cat-row cat-row--btn" onClick={() => setDrillCat({id: catId, name: c.name, color: c.color})}>
                     <span className="cat-dot" style={{background:c.color}} />
