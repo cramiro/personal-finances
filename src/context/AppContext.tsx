@@ -165,7 +165,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const { data: member, error: memErr } = await supabase
       .from('members')
-      .insert({ workspace_id: ws.id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 4), role: 'owner' })
+      .insert({ workspace_id: ws.id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 6), role: 'owner' })
       .select().single();
     if (memErr || !member) throw new Error(memErr?.message);
 
@@ -200,7 +200,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Insert member
     const { data: member, error: memErr } = await supabase
       .from('members')
-      .insert({ workspace_id: invite.workspace_id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 4), role: 'member' })
+      .insert({ workspace_id: invite.workspace_id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 6), role: 'member' })
       .select().single();
     if (memErr || !member) throw new Error(memErr?.message);
 

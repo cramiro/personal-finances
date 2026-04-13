@@ -74,7 +74,7 @@ export default function SetupScreen() {
           </div>
           <div className="field">
             <label className="label">Tu nombre corto</label>
-            <input className="input" placeholder="ej: RAMI" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={4} style={{ textTransform: 'uppercase' }} />
+            <input className="input" placeholder="ej: RAMI" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={6} style={{ textTransform: 'uppercase' }} />
           </div>
           <div className="field">
             <label className="label">Moneda por defecto</label>
@@ -96,7 +96,7 @@ export default function SetupScreen() {
           </div>
           <div className="field">
             <label className="label">Tu nombre corto</label>
-            <input className="input" placeholder="ej: CANDE" value={joinName} onChange={e => setJoinName(e.target.value)} maxLength={4} style={{ textTransform: 'uppercase' }} />
+            <input className="input" placeholder="ej: CANDE" value={joinName} onChange={e => setJoinName(e.target.value)} maxLength={6} style={{ textTransform: 'uppercase' }} />
           </div>
           {error && <p className="error">{error}</p>}
           <button className="btn" type="submit" disabled={loading}>{loading ? 'Uniéndome...' : 'Unirme'}</button>
