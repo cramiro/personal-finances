@@ -147,7 +147,21 @@ export default function SummaryScreen() {
                 >
                   <XAxis dataKey="month" tick={{fontSize:12,fill:'#6B6B6B'}} axisLine={false} tickLine={false} />
                   <YAxis hide />
-                  <Tooltip formatter={(v)=>formatAmount(Number(v),displayCur)} cursor={{fill:'#f0f0ee'}} />
+                  <Tooltip
+                    cursor={{fill:'#f0f0ee'}}
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const mk = (payload[0].payload as any).monthKey;
+                      const isActive = selectedMonth === mk;
+                      return (
+                        <div className="tt-box" onClick={() => setSelectedMonth((prev: string | null) => prev === mk ? null : mk)}>
+                          <p className="tt-month">{label}</p>
+                          <p className="tt-total">{formatAmount(Number(payload[0].value), displayCur)}</p>
+                          <p className="tt-action">{isActive ? '✕ quitar filtro' : 'ver detalle →'}</p>
+                        </div>
+                      );
+                    }}
+                  />
                   <Bar dataKey="total" radius={[6,6,0,0]}>
                     {chartData.map((d,i)=>(
                       <Cell key={i} fill={selectedMonth && selectedMonth !== d.monthKey ? '#b2d8cc' : '#1D9E75'} />
@@ -215,6 +229,10 @@ export default function SummaryScreen() {
         .pill { border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--text-secondary); transition: all 0.15s; }
         .pill--active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
         .chart-card { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .tt-box { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; min-width: 140px; }
+        .tt-month { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.4px; margin: 0 0 2px; }
+        .tt-total { font-size: 15px; font-weight: 800; color: var(--text); margin: 0 0 6px; }
+        .tt-action { font-size: 12px; font-weight: 700; color: var(--primary); margin: 0; }
         .section { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
         .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
