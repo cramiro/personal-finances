@@ -67,7 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function setupWorkspace(name: string, pin: string, displayName: string, currency: 'ARS' | 'USD') {
     const pin_hash = hashPin(pin);
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: `gastly_${Date.now()}@gastly.app`,
+      email: `gastly_${Date.now()}@gmail.com`,
       password: `${pin}_gastly_${Date.now()}`,
     });
     if (authError || !authData.user) throw new Error(authError?.message ?? 'Auth error');
