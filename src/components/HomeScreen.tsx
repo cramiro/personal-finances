@@ -26,7 +26,7 @@ export default function HomeScreen() {
       .from('expenses')
       .select('*, categories(name,color,icon), members(display_name)')
       .eq('workspace_id', workspace.id)
-      .order('created_at', { ascending: false })
+      .order('date', { ascending: false })
       .limit(15);
     setRecents(data ?? []);
   }, [workspace]);
