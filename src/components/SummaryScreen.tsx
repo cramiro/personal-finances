@@ -154,10 +154,10 @@ export default function SummaryScreen() {
                       const mk = (payload[0].payload as any).monthKey;
                       const isActive = selectedMonth === mk;
                       return (
-                        <div className="tt-box" onClick={() => setSelectedMonth((prev: string | null) => prev === mk ? null : mk)}>
+                        <div className="tt-box">
                           <p className="tt-month">{label}</p>
                           <p className="tt-total">{formatAmount(Number(payload[0].value), displayCur)}</p>
-                          <p className="tt-action">{isActive ? '✕ quitar filtro' : 'ver detalle →'}</p>
+                          <p className="tt-action">{isActive ? '✕ filtro activo' : 'tocá la barra para ver detalle'}</p>
                         </div>
                       );
                     }}
