@@ -69,8 +69,8 @@ export default function ExpenseDetailModal({ expense, categories, isOwner, displ
             <p className="d-amount">{formatAmount(toDisplay(expense), displayCur)}</p>
             {isOwner && (
               <div className="d-actions">
-                <button className="btn-ghost" onClick={() => setEditing(true)}>Editar</button>
                 <button className="btn-danger" onClick={handleDelete}>Eliminar</button>
+                <button className="btn-ghost" onClick={() => setEditing(true)}>Editar</button>
               </div>
             )}
           </>
