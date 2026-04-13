@@ -3,8 +3,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
+import { getDailyRate } from '@/lib/blueRate';
 import { formatAmount } from '@/lib/parser';
-import { Expense, Currency } from '@/types';
+import { Expense, Currency, Category } from '@/types';
 
 function getMonths() {
   const out = [];
@@ -20,7 +21,8 @@ function getMonths() {
 const MONTHS = getMonths();
 
 export default function SummaryScreen() {
-  const { workspace, members, blueRate, refreshBlueRate } = useApp();
+  const { workspace, members, categories, currentMember, blueRate, refreshBlueRate } = useApp();
+  const isOwner = currentMember?.role === 'owner';
   const [from, setFrom] = useState(MONTHS[2]?.value ?? MONTHS[0].value);
   const [to, setTo] = useState(MONTHS[0].value);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -203,7 +205,10 @@ export default function SummaryScreen() {
               expenses={expenses}
               toDisplay={toDisplay}
               displayCur={displayCur}
+              isOwner={isOwner}
+              categories={categories}
               onClose={() => setDrillCat(null)}
+              onReload={load}
             />
           )}
 
@@ -248,15 +253,20 @@ export default function SummaryScreen() {
   );
 }
 
-function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur, onClose }: {
+function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur, isOwner, categories, onClose, onReload }: {
   catId: string;
   catName: string;
   catColor: string;
   expenses: Expense[];
   toDisplay: (e: Expense) => number;
   displayCur: Currency;
+  isOwner: boolean;
+  categories: Category[];
   onClose: () => void;
+  onReload: () => void;
 }) {
+  const [selected, setSelected] = useState<Expense | null>(null);
+
   const items = expenses
     .filter(e => catId ? e.category_id === catId : !e.category_id)
     .sort((a, b) => toDisplay(b) - toDisplay(a));
@@ -266,6 +276,7 @@ function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur,
   }
 
   return (
+    <>
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <div className="modal-header">
@@ -277,13 +288,14 @@ function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur,
           {items.map(e => {
             const mem = e.members as any;
             return (
-              <div key={e.id} className="item-row">
+              <button key={e.id} className="item-row" onClick={() => setSelected(e)}>
                 <div className="item-info">
                   <span className="item-desc">{e.description}</span>
                   <span className="item-meta">{mem?.display_name} · {fmtDate(e.date)}</span>
                 </div>
                 <span className="item-amount">{formatAmount(toDisplay(e), displayCur)}</span>
-              </div>
+                {isOwner && <span className="item-chevron">›</span>}
+              </button>
             );
           })}
           {items.length === 0 && <p className="empty">Sin gastos</p>}
@@ -297,12 +309,140 @@ function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur,
         .modal-title { flex: 1; font-size: 18px; font-weight: 700; margin: 0; }
         .close-btn { border: none; background: none; font-size: 18px; color: var(--text-tertiary); padding: 4px; cursor: pointer; }
         .modal-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-        .item-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--border); }
+        .item-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--border); width: 100%; background: none; border-left: none; border-right: none; border-bottom: none; cursor: pointer; text-align: left; }
         .item-info { flex: 1; overflow: hidden; }
         .item-desc { display: block; font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .item-meta { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
         .item-amount { font-size: 14px; font-weight: 700; color: var(--text); flex-shrink: 0; }
+        .item-chevron { font-size: 18px; color: var(--text-tertiary); flex-shrink: 0; }
         .empty { color: var(--text-tertiary); font-size: 14px; text-align: center; padding: 24px 0; margin: 0; }
+      `}</style>
+    </div>
+    {selected && (
+      <ExpenseDetailModal
+        expense={selected}
+        categories={categories}
+        isOwner={isOwner}
+        displayCur={displayCur}
+        toDisplay={toDisplay}
+        onClose={() => setSelected(null)}
+        onSaved={() => { setSelected(null); onReload(); }}
+        onDeleted={() => { setSelected(null); onClose(); onReload(); }}
+      />
+    )}
+    </>
+  );
+}
+
+function ExpenseDetailModal({ expense, categories, isOwner, displayCur, toDisplay, onClose, onSaved, onDeleted }: {
+  expense: Expense;
+  categories: Category[];
+  isOwner: boolean;
+  displayCur: Currency;
+  toDisplay: (e: Expense) => number;
+  onClose: () => void;
+  onSaved: () => void;
+  onDeleted: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState(String(expense.amount));
+  const [description, setDescription] = useState(expense.description);
+  const [categoryId, setCategoryId] = useState(expense.category_id);
+  const [currency, setCurrency] = useState<Currency>(expense.currency);
+  const [saving, setSaving] = useState(false);
+
+  const cat = expense.categories as any;
+
+  async function handleSave() {
+    const num = parseFloat(amount.replace(',', '.'));
+    if (!num || num <= 0) return;
+    setSaving(true);
+    const dateStr = expense.date.slice(0, 10);
+    const rate = await getDailyRate(dateStr);
+    const amount_ars = currency === 'ARS' ? num : Math.round(num * rate);
+    const amount_usd = currency === 'USD' ? num : Math.round(num / rate * 100) / 100;
+    await supabase.from('expenses').update({ amount: num, description: description.trim(), category_id: categoryId, currency, amount_ars, amount_usd }).eq('id', expense.id);
+    setSaving(false);
+    onSaved();
+  }
+
+  async function handleDelete() {
+    if (!confirm('¿Eliminar este gasto?')) return;
+    await supabase.from('expenses').delete().eq('id', expense.id);
+    onDeleted();
+  }
+
+  function fmtDate(d: string) {
+    return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  return (
+    <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        {!editing ? (
+          <>
+            <div className="dh">
+              <div>
+                <p className="d-desc">{expense.description}</p>
+                <p className="d-meta">{cat?.name} · {fmtDate(expense.date)}</p>
+              </div>
+              <button className="close-btn" onClick={onClose}>✕</button>
+            </div>
+            <p className="d-amount">{formatAmount(toDisplay(expense), displayCur)}</p>
+            {isOwner && (
+              <div className="d-actions">
+                <button className="btn-ghost" onClick={() => setEditing(true)}>Editar</button>
+                <button className="btn-danger" onClick={handleDelete}>Eliminar</button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <h3 className="modal-title">Editar gasto</h3>
+            <label className="label">Monto</label>
+            <div className="amount-row">
+              <input className="input" type="number" value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" />
+              <div className="currency-toggle">
+                {(['ARS', 'USD'] as const).map(c => (
+                  <button key={c} type="button" className={`cur-btn ${currency === c ? 'active' : ''}`} onClick={() => setCurrency(c)}>{c}</button>
+                ))}
+              </div>
+            </div>
+            <label className="label">Descripción</label>
+            <input className="input" value={description} onChange={e => setDescription(e.target.value)} />
+            <label className="label">Categoría</label>
+            <select className="input" value={categoryId ?? ''} onChange={e => setCategoryId(e.target.value)}>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <div className="d-actions">
+              <button className="btn-ghost" onClick={() => setEditing(false)}>Cancelar</button>
+              <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button>
+            </div>
+          </>
+        )}
+      </div>
+      <style jsx>{`
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; z-index: 300; }
+        .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 24px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 12px; }
+        .dh { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .d-desc { font-size: 18px; font-weight: 700; color: var(--text); margin: 0 0 4px; }
+        .d-meta { font-size: 13px; color: var(--text-secondary); margin: 0; }
+        .d-amount { font-size: 32px; font-weight: 800; color: var(--text); letter-spacing: -1px; margin: 0; }
+        .close-btn { border: none; background: none; font-size: 18px; color: var(--text-tertiary); padding: 4px; cursor: pointer; flex-shrink: 0; }
+        .d-actions { display: flex; gap: 10px; margin-top: 4px; }
+        .btn-ghost { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 600; color: var(--text-secondary); background: none; cursor: pointer; }
+        .btn-danger { flex: 1; border: 1.5px solid var(--danger); border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700; color: var(--danger); background: none; cursor: pointer; }
+        .btn-primary { flex: 1; background: var(--primary); color: white; border: none; border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .btn-primary:disabled { opacity: 0.6; }
+        .modal-title { font-size: 18px; font-weight: 700; margin: 0; }
+        .label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+        .input { border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 15px; color: var(--text); width: 100%; font-family: inherit; background: var(--surface); }
+        .input:focus { border-color: var(--primary); outline: none; }
+        .amount-row { display: flex; gap: 8px; align-items: center; }
+        .amount-row .input { flex: 1; }
+        .currency-toggle { display: flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .cur-btn { border: none; padding: 10px 12px; font-size: 13px; font-weight: 700; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
+        .cur-btn.active { background: var(--primary); color: white; }
       `}</style>
     </div>
   );
