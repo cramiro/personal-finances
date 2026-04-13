@@ -4,8 +4,8 @@ import { useApp } from '@/context/AppContext';
 import { parseExpense, formatAmount } from '@/lib/parser';
 import { supabase } from '@/lib/supabase';
 import { getDailyRate } from '@/lib/blueRate';
-import type { Currency } from '@/types';
-import { Expense, Category } from '@/types';
+import { Expense } from '@/types';
+import ExpenseDetailModal from '@/components/ExpenseDetailModal';
 
 export default function HomeScreen() {
   const { workspace, currentMember, categories } = useApp();
@@ -13,8 +13,7 @@ export default function HomeScreen() {
   const [recents, setRecents] = useState<Expense[]>([]);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
-  const [editing, setEditing] = useState<Expense | null>(null);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Expense | null>(null);
   const [showRecents, setShowRecents] = useState(false);
 
   const parsed = parseExpense(input, categories, workspace?.default_currency ?? 'ARS');
@@ -34,12 +33,6 @@ export default function HomeScreen() {
 
   useEffect(() => { loadRecents(); }, [loadRecents]);
 
-  useEffect(() => {
-    if (!openMenu) return;
-    function close() { setOpenMenu(null); }
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, [openMenu]);
 
   async function handleConfirm(e: React.FormEvent) {
     e.preventDefault();
@@ -67,13 +60,6 @@ export default function HomeScreen() {
       setTimeout(() => setSavedMsg(false), 2000);
       loadRecents();
     }
-  }
-
-  async function handleDelete(id: string) {
-    setOpenMenu(null);
-    if (!confirm('¿Eliminar este gasto?')) return;
-    await supabase.from('expenses').delete().eq('id', id);
-    loadRecents();
   }
 
   function timeAgo(d: string) {
@@ -126,7 +112,7 @@ export default function HomeScreen() {
           const cat = e.categories as any;
           const mem = e.members as any;
           return (
-            <div key={e.id} className="expense-row">
+            <button key={e.id} className="expense-row" onClick={() => setSelected(e)}>
               <span className="cat-dot" style={{ background: cat?.color ?? '#888' }} />
               <div className="exp-info">
                 <span className="exp-desc">{e.description}</span>
@@ -136,28 +122,22 @@ export default function HomeScreen() {
                 <span className="exp-amount">{formatAmount(e.amount, e.currency)}</span>
                 <span className="exp-time">{timeAgo(e.created_at)}</span>
               </div>
-              {isOwner && (
-                <div className="menu-wrap">
-                  <button className="menu-trigger" onClick={() => setOpenMenu(openMenu === e.id ? null : e.id)}>···</button>
-                  {openMenu === e.id && (
-                    <div className="menu-dropdown">
-                      <button className="menu-item" onClick={() => { setOpenMenu(null); setEditing(e); }}>Editar</button>
-                      <button className="menu-item menu-item--danger" onClick={() => handleDelete(e.id)}>Eliminar</button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+              <span className="row-chevron">›</span>
+            </button>
           );
         })}
       </div>
 
-      {editing && (
-        <EditModal
-          expense={editing}
+      {selected && (
+        <ExpenseDetailModal
+          expense={selected}
           categories={categories}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); loadRecents(); }}
+          isOwner={isOwner}
+          displayCur={selected.currency}
+          toDisplay={e => e.amount}
+          onClose={() => setSelected(null)}
+          onSaved={() => { setSelected(null); loadRecents(); }}
+          onDeleted={() => { setSelected(null); loadRecents(); }}
         />
       )}
 
@@ -181,106 +161,18 @@ export default function HomeScreen() {
         .chevron--up { transform: rotate(180deg); }
         .expense-list { display: flex; flex-direction: column; gap: 2px; }
         .expense-list--hidden { display: none; }
-        .expense-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 10px; padding: 12px; }
+        .expense-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 10px; padding: 12px; width: 100%; border: none; text-align: left; cursor: pointer; }
+        .expense-row:active { opacity: 0.7; }
         .exp-info { flex: 1; overflow: hidden; }
         .exp-desc { display: block; font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .exp-meta { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
         .exp-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
         .exp-amount { font-size: 14px; font-weight: 700; color: var(--text); }
         .exp-time { font-size: 11px; color: var(--text-tertiary); }
-        .menu-wrap { position: relative; flex-shrink: 0; }
-        .menu-trigger { border: none; background: none; font-size: 18px; font-weight: 700; color: var(--text-tertiary); padding: 4px 6px; cursor: pointer; border-radius: 6px; line-height: 1; letter-spacing: 1px; }
-        .menu-trigger:hover { color: var(--text-secondary); }
-        .menu-dropdown { position: absolute; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 50; min-width: 110px; overflow: hidden; }
-        .menu-item { display: block; width: 100%; text-align: left; border: none; background: none; padding: 11px 14px; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
-        .menu-item:hover { background: var(--bg); }
-        .menu-item--danger { color: var(--danger); }
+        .row-chevron { font-size: 18px; color: var(--text-tertiary); flex-shrink: 0; }
         .empty { color: var(--text-tertiary); font-size: 14px; text-align: center; padding: 32px 0; margin: 0; }
       `}</style>
     </div>
   );
 }
 
-function EditModal({ expense, categories, onClose, onSaved }: {
-  expense: Expense;
-  categories: Category[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [amount, setAmount] = useState(String(expense.amount));
-  const [description, setDescription] = useState(expense.description);
-  const [categoryId, setCategoryId] = useState(expense.category_id);
-  const [currency, setCurrency] = useState<Currency>(expense.currency);
-  const [saving, setSaving] = useState(false);
-
-  async function handleSave() {
-    const num = parseFloat(amount.replace(',', '.'));
-    if (!num || num <= 0) return;
-    setSaving(true);
-    const dateStr = expense.date.slice(0, 10);
-    const rate = await getDailyRate(dateStr);
-    const amount_ars = currency === 'ARS' ? num : Math.round(num * rate);
-    const amount_usd = currency === 'USD' ? num : Math.round(num / rate * 100) / 100;
-    await supabase.from('expenses').update({
-      amount: num,
-      description: description.trim(),
-      category_id: categoryId,
-      currency,
-      amount_ars,
-      amount_usd,
-    }).eq('id', expense.id);
-    setSaving(false);
-    onSaved();
-  }
-
-  return (
-    <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal">
-        <h3 className="title">Editar gasto</h3>
-
-        <label className="label">Monto</label>
-        <div className="amount-row">
-          <input className="input" type="number" value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" />
-          <div className="currency-toggle">
-            {(['ARS', 'USD'] as const).map(c => (
-              <button key={c} type="button" className={`cur-btn ${currency === c ? 'active' : ''}`} onClick={() => setCurrency(c)}>{c}</button>
-            ))}
-          </div>
-        </div>
-
-        <label className="label">Descripción</label>
-        <input className="input" value={description} onChange={e => setDescription(e.target.value)} />
-
-        <label className="label">Categoría</label>
-        <select className="input" value={categoryId ?? ''} onChange={e => setCategoryId(e.target.value)}>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-
-        <div className="modal-actions">
-          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
-      </div>
-
-      <style jsx>{`
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: flex-end; justify-content: center; z-index: 200; }
-        .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 24px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
-        .title { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
-        .label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
-        .input { border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 15px; color: var(--text); width: 100%; font-family: inherit; }
-        .input:focus { border-color: var(--primary); outline: none; }
-        .amount-row { display: flex; gap: 8px; align-items: center; }
-        .amount-row .input { flex: 1; }
-        .currency-toggle { display: flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
-        .cur-btn { border: none; padding: 10px 12px; font-size: 13px; font-weight: 700; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
-        .cur-btn.active { background: var(--primary); color: white; }
-        .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
-        .btn-primary { flex: 1; background: var(--primary); color: white; border: none; border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
-        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-ghost { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 600; color: var(--text-secondary); background: none; cursor: pointer; }
-      `}</style>
-    </div>
-  );
-}
