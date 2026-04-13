@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
-import { Category } from '@/types';
+import { Category, Invite } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
 import { parseExpense } from '@/lib/parser';
 
@@ -46,13 +46,53 @@ function timeAgoEs(d: string | null): string {
 function GeneralTab() {
   const { workspace, members, currentMember, logout } = useApp();
   const [copied, setCopied] = useState(false);
+  const [invite, setInvite] = useState<Invite | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const isOwner = currentMember?.role === 'owner';
 
-  function copyCode() {
-    if (!workspace) return;
-    navigator.clipboard.writeText(workspace.id);
+  useEffect(() => {
+    if (!workspace || !isOwner) { setInviteLoading(false); return; }
+    supabase
+      .from('invites')
+      .select('*')
+      .eq('workspace_id', workspace.id)
+      .is('used_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => { setInvite(data ?? null); setInviteLoading(false); });
+  }, [workspace, isOwner]);
+
+  async function generateInvite() {
+    if (!workspace || !currentMember) return;
+    setGenerating(true);
+    // Invalidate existing active invites
+    await supabase.from('invites')
+      .update({ expires_at: new Date().toISOString() })
+      .eq('workspace_id', workspace.id)
+      .is('used_at', null);
+    // Create new invite
+    const { data } = await supabase
+      .from('invites')
+      .insert({ workspace_id: workspace.id, created_by: currentMember.user_id })
+      .select().single();
+    setInvite(data ?? null);
+    setGenerating(false);
+  }
+
+  function copyToken() {
+    if (!invite) return;
+    navigator.clipboard.writeText(invite.token);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function hoursLeft(expiresAt: string) {
+    const h = Math.round((new Date(expiresAt).getTime() - Date.now()) / 3_600_000);
+    if (h < 1) return 'menos de 1h';
+    return `${h}h`;
   }
 
   return (
@@ -82,20 +122,32 @@ function GeneralTab() {
         ))}
       </section>
 
-      <section className="card">
-        <h3 className="card-title">Código de invitación</h3>
-        <p style={{fontSize:13,color:'var(--text-secondary)',margin:'0 0 10px',lineHeight:1.5}}>
-          Compartí este código para que otros puedan unirse a tu workspace.
-        </p>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <code style={{flex:1,background:'var(--bg)',border:'1.5px solid var(--border)',borderRadius:8,padding:'10px 12px',fontSize:11,color:'var(--text-secondary)',wordBreak:'break-all'}}>
-            {workspace?.id}
-          </code>
-          <button className="btn-primary sm" onClick={copyCode} style={{flexShrink:0}}>
-            {copied ? '✓' : 'Copiar'}
-          </button>
-        </div>
-      </section>
+      {isOwner && (
+        <section className="card">
+          <h3 className="card-title">Código de invitación</h3>
+          <p className="invite-desc">Dura 48 horas y es de un solo uso. Generá uno nuevo cuando lo necesites.</p>
+          {inviteLoading ? (
+            <p className="invite-hint">Cargando...</p>
+          ) : invite ? (
+            <>
+              <div className="invite-row">
+                <code className="invite-token">{invite.token}</code>
+                <button className="btn-primary sm" onClick={copyToken}>{copied ? '✓' : 'Copiar'}</button>
+              </div>
+              <div className="invite-footer">
+                <span className="invite-expiry">Expira en {hoursLeft(invite.expires_at)}</span>
+                <button className="btn-ghost sm" onClick={generateInvite} disabled={generating}>
+                  {generating ? '...' : 'Regenerar'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <button className="btn-primary" onClick={generateInvite} disabled={generating}>
+              {generating ? 'Generando...' : 'Generar código'}
+            </button>
+          )}
+        </section>
+      )}
 
       <button className="danger-btn" onClick={logout}>Cerrar sesión</button>
 
@@ -108,16 +160,22 @@ function GeneralTab() {
         .add-row { margin-top: 10px; }
         .input { width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; color: var(--text); }
         .input:focus { border-color: var(--primary); }
-        .btn-primary { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 700; }
-        .btn-ghost { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 600; color: var(--text-secondary); }
-        .sm { font-size: 13px; }
-        .danger-btn { border: 1.5px solid var(--danger); background: none; color: var(--danger); border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700; }
+        .btn-primary { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .btn-ghost { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; }
+        .sm { font-size: 13px; padding: 7px 12px; }
+        .danger-btn { border: 1.5px solid var(--danger); background: none; color: var(--danger); border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
         .member-card { border-top: 1px solid var(--border); padding: 10px 0 6px; }
         .member-top { display: flex; justify-content: space-between; align-items: center; }
         .member-name { font-size: 14px; font-weight: 700; color: var(--text); }
         .member-role { font-size: 12px; color: var(--text-tertiary); background: var(--bg); border-radius: 5px; padding: 2px 7px; font-weight: 600; }
         .member-meta { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
         .meta-row { font-size: 12px; color: var(--text-secondary); }
+        .invite-desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; line-height: 1.5; }
+        .invite-hint { font-size: 13px; color: var(--text-tertiary); margin: 0; }
+        .invite-row { display: flex; gap: 8px; align-items: center; }
+        .invite-token { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--text); word-break: break-all; font-family: monospace; }
+        .invite-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .invite-expiry { font-size: 12px; color: var(--text-tertiary); }
       `}</style>
     </div>
   );

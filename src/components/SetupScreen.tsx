@@ -89,9 +89,9 @@ export default function SetupScreen() {
         </form>
       ) : (
         <form onSubmit={handleJoin} className="form">
-          <p className="hint">Pedíle a quien creó el workspace que te comparta el código desde Config → Código de invitación.</p>
+          <p className="hint">Pedíle al owner que genere un código desde Config → Código de invitación. El código dura 48 horas y es de un solo uso.</p>
           <div className="field">
-            <label className="label">Código del workspace</label>
+            <label className="label">Código de invitación</label>
             <input className="input" placeholder="Pegá el código acá" value={code} onChange={e => setCode(e.target.value)} autoCorrect="off" autoCapitalize="none" spellCheck={false} />
           </div>
           <div className="field">

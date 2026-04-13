@@ -56,6 +56,17 @@ export interface ParsedExpense {
   categoryColor: string;
 }
 
+export interface Invite {
+  id: string;
+  workspace_id: string;
+  token: string;
+  created_by: string;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+  used_by: string | null;
+}
+
 export interface BlueRate {
   compra: number;
   venta: number;

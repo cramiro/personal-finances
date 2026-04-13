@@ -185,24 +185,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('No autenticado');
 
-    // code is the workspace id
-    const { data: ws, error: wsErr } = await supabase
-      .from('workspaces').select('*').eq('id', code.trim()).single();
-    if (wsErr || !ws) throw new Error('Código inválido — verificá que esté bien escrito');
+    // Look up the invite token
+    const { data: invite } = await supabase
+      .from('invites').select('*').eq('token', code.trim()).single();
+    if (!invite) throw new Error('Código inválido — verificá que esté bien escrito');
+    if (invite.used_at) throw new Error('Este código de invitación ya fue utilizado');
+    if (new Date(invite.expires_at) <= new Date()) throw new Error('Este código venció — pedile al owner que genere uno nuevo');
 
+    // Guard: user must not already belong to a workspace
+    const { data: existing } = await supabase
+      .from('members').select('id').eq('user_id', user.id).limit(1).single();
+    if (existing) throw new Error('Ya pertenecés a un workspace');
+
+    // Insert member
     const { data: member, error: memErr } = await supabase
       .from('members')
-      .insert({ workspace_id: ws.id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 4), role: 'member' })
+      .insert({ workspace_id: invite.workspace_id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 4), role: 'member' })
       .select().single();
     if (memErr || !member) throw new Error(memErr?.message);
 
-    const [{ data: cats }, { data: mems }, blue] = await Promise.all([
-      supabase.from('categories').select('*').eq('workspace_id', ws.id).order('sort_order'),
-      supabase.from('members').select('*').eq('workspace_id', ws.id),
+    // Mark invite as used (best-effort)
+    await supabase.from('invites')
+      .update({ used_at: new Date().toISOString(), used_by: user.id })
+      .eq('id', invite.id);
+
+    const [{ data: ws }, { data: cats }, { data: mems }, blue] = await Promise.all([
+      supabase.from('workspaces').select('*').eq('id', invite.workspace_id).single(),
+      supabase.from('categories').select('*').eq('workspace_id', invite.workspace_id).order('sort_order'),
+      supabase.from('members').select('*').eq('workspace_id', invite.workspace_id),
       getBlueRate(),
     ]);
 
-    localStorage.setItem(WS_KEY, ws.id);
+    localStorage.setItem(WS_KEY, invite.workspace_id);
     localStorage.setItem(MEM_KEY, member.id);
     setState(s => ({ ...s, workspace: ws, currentMember: member, members: mems ?? [], categories: cats ?? [], blueRate: blue }));
   }
