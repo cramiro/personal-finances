@@ -138,10 +138,10 @@ export default function SummaryScreen() {
               <p className="section-label">Por mes</p>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={chartData} margin={{top:4,right:4,bottom:0,left:0}}
-                  onClick={(d) => {
+                  onClick={(d: any) => {
                     if (!d?.activePayload?.[0]) return;
                     const mk = d.activePayload[0].payload.monthKey;
-                    setSelectedMonth(prev => prev === mk ? null : mk);
+                    setSelectedMonth((prev: string | null) => prev === mk ? null : mk);
                   }}
                   style={{cursor:'pointer'}}
                 >
