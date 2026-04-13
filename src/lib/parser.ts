@@ -30,14 +30,28 @@ export function parseExpense(input: string, categories: Category[], defaultCurre
 
   const words = remaining.split(/\s+/).filter(Boolean);
   let matched: Category | undefined;
-  let bestScore = 0;
+  let bestCount = 0;
+  let bestMaxLen = 0;
   for (const cat of categories) {
+    let matchCount = 0;
+    let maxLen = 0;
     for (const kw of cat.keywords) {
       for (const word of words) {
         if (word.includes(kw) || kw.includes(word)) {
-          if (kw.length > bestScore) { bestScore = kw.length; matched = cat; }
+          matchCount++;
+          if (kw.length > maxLen) maxLen = kw.length;
+          break; // count each keyword once even if multiple words match it
         }
       }
+    }
+    if (matchCount === 0) continue;
+    if (
+      matchCount > bestCount ||
+      (matchCount === bestCount && maxLen > bestMaxLen)
+    ) {
+      bestCount = matchCount;
+      bestMaxLen = maxLen;
+      matched = cat;
     }
   }
 
