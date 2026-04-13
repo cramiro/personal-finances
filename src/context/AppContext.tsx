@@ -81,6 +81,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       categories: cats ?? [], blueRate: blue,
       isAuthenticated: true, isLoading: false,
     });
+
+    // Fire-and-forget: update last seen info for current member
+    updateLastSeen(member.id);
+  }
+
+  async function updateLastSeen(memberId: string) {
+    try {
+      const device = parseDevice(navigator.userAgent);
+      let location = 'Desconocida';
+      try {
+        const res = await fetch('https://ip-api.com/json/?fields=city,country,status', { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'success') location = `${json.city}, ${json.country}`;
+        }
+      } catch { /* ignore geo errors */ }
+      await supabase.from('members').update({
+        last_seen_at: new Date().toISOString(),
+        last_device: device,
+        last_location: location,
+      }).eq('id', memberId);
+    } catch { /* ignore */ }
+  }
+
+  function parseDevice(ua: string): string {
+    if (/iPhone/.test(ua)) return 'iPhone';
+    if (/iPad/.test(ua)) return 'iPad';
+    if (/Android.*Mobile/.test(ua)) return 'Android (móvil)';
+    if (/Android/.test(ua)) return 'Android (tablet)';
+    if (/Macintosh/.test(ua)) return 'Mac';
+    if (/Windows/.test(ua)) return 'Windows';
+    if (/Linux/.test(ua)) return 'Linux';
+    return 'Desconocido';
   }
 
   async function login(email: string, password: string) {

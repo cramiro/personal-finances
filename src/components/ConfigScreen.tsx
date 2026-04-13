@@ -32,9 +32,21 @@ export default function ConfigScreen() {
   );
 }
 
+function timeAgoEs(d: string | null): string {
+  if (!d) return 'Nunca';
+  const diff = (Date.now() - new Date(d).getTime()) / 1000;
+  if (diff < 60) return 'Hace un momento';
+  if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `Hace ${Math.floor(diff / 3600)} h`;
+  if (diff < 86400 * 2) return 'Ayer';
+  if (diff < 86400 * 7) return `Hace ${Math.floor(diff / 86400)} días`;
+  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+}
+
 function GeneralTab() {
-  const { workspace, members, logout } = useApp();
+  const { workspace, members, currentMember, logout } = useApp();
   const [copied, setCopied] = useState(false);
+  const isOwner = currentMember?.role === 'owner';
 
   function copyCode() {
     if (!workspace) return;
@@ -53,7 +65,21 @@ function GeneralTab() {
 
       <section className="card">
         <h3 className="card-title">Miembros</h3>
-        {members.map(m=><Row key={m.id} label={m.display_name} value={m.role==='owner'?'owner':'miembro'} />)}
+        {members.map(m => (
+          <div key={m.id} className="member-card">
+            <div className="member-top">
+              <span className="member-name">{m.display_name}</span>
+              <span className="member-role">{m.role === 'owner' ? 'owner' : 'miembro'}</span>
+            </div>
+            {isOwner && (
+              <div className="member-meta">
+                <span className="meta-row">🕐 {timeAgoEs(m.last_seen_at)}</span>
+                <span className="meta-row">📱 {m.last_device ?? 'Desconocido'}</span>
+                <span className="meta-row">📍 {m.last_location ?? 'Desconocida'}</span>
+              </div>
+            )}
+          </div>
+        ))}
       </section>
 
       <section className="card">
@@ -86,6 +112,12 @@ function GeneralTab() {
         .btn-ghost { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 600; color: var(--text-secondary); }
         .sm { font-size: 13px; }
         .danger-btn { border: 1.5px solid var(--danger); background: none; color: var(--danger); border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700; }
+        .member-card { border-top: 1px solid var(--border); padding: 10px 0 6px; }
+        .member-top { display: flex; justify-content: space-between; align-items: center; }
+        .member-name { font-size: 14px; font-weight: 700; color: var(--text); }
+        .member-role { font-size: 12px; color: var(--text-tertiary); background: var(--bg); border-radius: 5px; padding: 2px 7px; font-weight: 600; }
+        .member-meta { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+        .meta-row { font-size: 12px; color: var(--text-secondary); }
       `}</style>
     </div>
   );

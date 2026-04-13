@@ -15,6 +15,9 @@ export interface Member {
   display_name: string;
   role: 'owner' | 'member';
   created_at: string;
+  last_seen_at: string | null;
+  last_device: string | null;
+  last_location: string | null;
 }
 
 export interface Category {
