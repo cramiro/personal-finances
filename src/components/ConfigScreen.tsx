@@ -106,21 +106,52 @@ function CategoriesTab() {
   const [name, setName] = useState('');
   const [keywords, setKeywords] = useState('');
   const [color, setColor] = useState('#888780');
+  const [savedCat, setSavedCat] = useState<{id:string;name:string;keywords:string[]} | null>(null);
+  const [reprocessing, setReprocessing] = useState(false);
+  const [reprocessResult, setReprocessResult] = useState<number|null>(null);
 
-  function openEdit(cat: Category) { setEditing(cat); setIsNew(false); setName(cat.name); setKeywords(cat.keywords.join(', ')); setColor(cat.color); }
-  function openNew() { setEditing(null); setIsNew(true); setName(''); setKeywords(''); setColor('#888780'); }
-  function closeModal() { setEditing(null); setIsNew(false); }
+  function openEdit(cat: Category) { setEditing(cat); setIsNew(false); setName(cat.name); setKeywords(cat.keywords.join(', ')); setColor(cat.color); setSavedCat(null); setReprocessResult(null); }
+  function openNew() { setEditing(null); setIsNew(true); setName(''); setKeywords(''); setColor('#888780'); setSavedCat(null); setReprocessResult(null); }
+  function closeModal() { setEditing(null); setIsNew(false); setSavedCat(null); setReprocessResult(null); }
 
   async function save() {
     if (!workspace || !name.trim()) return;
     const kws = keywords.split(',').map(k=>k.trim().toLowerCase()).filter(Boolean);
+    let catId = editing?.id ?? '';
     if (editing) {
       await supabase.from('categories').update({ name:name.trim(), keywords:kws, color }).eq('id', editing.id);
     } else {
       const maxOrder = Math.max(0,...categories.map(c=>c.sort_order));
-      await supabase.from('categories').insert({ workspace_id:workspace.id, name:name.trim(), keywords:kws, color, icon:'📦', is_default:false, sort_order:maxOrder+1 });
+      const { data } = await supabase.from('categories').insert({ workspace_id:workspace.id, name:name.trim(), keywords:kws, color, icon:'📦', is_default:false, sort_order:maxOrder+1 }).select().single();
+      catId = data?.id ?? '';
     }
-    closeModal(); reloadCategories();
+    await reloadCategories();
+    setSavedCat({ id: catId, name: name.trim(), keywords: kws });
+    setReprocessResult(null);
+  }
+
+  async function reprocess() {
+    if (!workspace || !savedCat || savedCat.keywords.length === 0) return;
+    setReprocessing(true);
+    const yearStart = `${new Date().getFullYear()}-01-01`;
+    const { data: expenses } = await supabase
+      .from('expenses')
+      .select('id, description')
+      .eq('workspace_id', workspace.id)
+      .gte('date', yearStart);
+
+    const matching = (expenses ?? []).filter(e => {
+      const desc = e.description.toLowerCase();
+      return savedCat.keywords.some(kw => desc.includes(kw));
+    });
+
+    if (matching.length > 0) {
+      await supabase.from('expenses')
+        .update({ category_id: savedCat.id })
+        .in('id', matching.map(e => e.id));
+    }
+    setReprocessResult(matching.length);
+    setReprocessing(false);
   }
 
   async function del(cat: Category) {
@@ -129,7 +160,7 @@ function CategoriesTab() {
     reloadCategories();
   }
 
-  const showModal = !!editing || isNew;
+  const showModal = !!editing || isNew || !!savedCat;
 
   return (
     <div className="content">
@@ -150,25 +181,53 @@ function CategoriesTab() {
       {showModal && (
         <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)closeModal();}}>
           <div className="modal">
-            <h3 className="modal-title">{isNew ? 'Nueva categoría' : 'Editar categoría'}</h3>
+            {savedCat ? (
+              <>
+                <h3 className="modal-title">✓ Categoría guardada</h3>
+                <p className="reprocess-desc">
+                  ¿Querés reprocesar los gastos del año {new Date().getFullYear()} y asignar automáticamente <strong>{savedCat.name}</strong> a los que coincidan con los keywords?
+                </p>
+                {savedCat.keywords.length > 0
+                  ? <p className="reprocess-kws">{savedCat.keywords.join(', ')}</p>
+                  : <p className="reprocess-kws reprocess-kws--empty">Sin keywords — no se puede reprocesar</p>
+                }
+                {reprocessResult !== null && (
+                  <p className="reprocess-result">
+                    {reprocessResult > 0 ? `✓ ${reprocessResult} gasto${reprocessResult !== 1 ? 's' : ''} actualizado${reprocessResult !== 1 ? 's' : ''}` : 'Ningún gasto coincidió con los keywords'}
+                  </p>
+                )}
+                <div className="modal-actions">
+                  <button className="btn-ghost" onClick={closeModal}>Cerrar</button>
+                  {savedCat.keywords.length > 0 && reprocessResult === null && (
+                    <button className="btn-primary" onClick={reprocess} disabled={reprocessing}>
+                      {reprocessing ? 'Procesando...' : 'Reprocesar'}
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="modal-title">{isNew ? 'Nueva categoría' : 'Editar categoría'}</h3>
 
-            <label className="field-label">Nombre</label>
-            <input className="field-input" value={name} onChange={e=>setName(e.target.value)} placeholder="Supermercado" autoFocus />
+                <label className="field-label">Nombre</label>
+                <input className="field-input" value={name} onChange={e=>setName(e.target.value)} placeholder="Supermercado" autoFocus />
 
-            <label className="field-label">Keywords (separados por coma)</label>
-            <textarea className="field-input" value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="super, coto, jumbo" rows={3} />
+                <label className="field-label">Keywords (separados por coma)</label>
+                <textarea className="field-input" value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="super, coto, jumbo" rows={3} />
 
-            <label className="field-label">Color</label>
-            <div className="color-grid">
-              {COLORS.map(c=>(
-                <button key={c} className={`color-dot ${color===c?'color-dot--active':''}`} style={{background:c}} onClick={()=>setColor(c)} />
-              ))}
-            </div>
+                <label className="field-label">Color</label>
+                <div className="color-grid">
+                  {COLORS.map(c=>(
+                    <button key={c} className={`color-dot ${color===c?'color-dot--active':''}`} style={{background:c}} onClick={()=>setColor(c)} />
+                  ))}
+                </div>
 
-            <div className="modal-actions">
-              <button className="btn-ghost" onClick={closeModal}>Cancelar</button>
-              <button className="btn-primary" onClick={save}>Guardar</button>
-            </div>
+                <div className="modal-actions">
+                  <button className="btn-ghost" onClick={closeModal}>Cancelar</button>
+                  <button className="btn-primary" onClick={save}>Guardar</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -186,6 +245,10 @@ function CategoriesTab() {
         .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:flex-end;justify-content:center;z-index:200; }
         .modal { background:var(--surface);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:12px;max-height:90dvh;overflow-y:auto; }
         .modal-title { font-size:18px;font-weight:700;margin:0; }
+        .reprocess-desc { font-size:14px;color:var(--text);line-height:1.5;margin:0; }
+        .reprocess-kws { font-size:13px;color:var(--text-secondary);background:var(--bg);border-radius:8px;padding:10px 12px;margin:0; }
+        .reprocess-kws--empty { color:var(--text-tertiary);font-style:italic; }
+        .reprocess-result { font-size:14px;font-weight:700;color:var(--primary);margin:0;text-align:center;padding:8px 0; }
         .field-label { font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:-6px; }
         .field-input { border:1.5px solid var(--border);border-radius:8px;padding:11px 12px;font-size:14px;color:var(--text);width:100%;resize:none;font-family:inherit; }
         .field-input:focus { border-color:var(--primary);outline:none; }
