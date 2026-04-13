@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/lib/supabase';
 import { Workspace, Member, Category, BlueRate } from '@/types';
 import { getBlueRate } from '@/lib/blueRate';
-import { hashPin } from '@/lib/pin';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
 
 const WS_KEY = 'gastly_workspace_id';
@@ -21,9 +20,10 @@ interface AppState {
 
 interface AppCtx extends AppState {
   hasWorkspace: boolean;
-  unlockWithPin: (pin: string) => Promise<boolean>;
-  lockApp: () => void;
-  setupWorkspace: (name: string, pin: string, displayName: string, currency: 'ARS' | 'USD') => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  setupWorkspace: (name: string, displayName: string, currency: 'ARS' | 'USD') => Promise<void>;
   reloadCategories: () => Promise<void>;
   reloadMembers: () => Promise<void>;
   refreshBlueRate: () => Promise<void>;
@@ -40,50 +40,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { initialize(); }, []);
 
   async function initialize() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setState(s => ({ ...s, isLoading: false })); return; }
+      await loadUserData(session.user.id);
+    } catch {
+      setState(s => ({ ...s, isLoading: false }));
+    }
+  }
+
+  async function loadUserData(userId: string) {
     const workspaceId = localStorage.getItem(WS_KEY);
     const memberId = localStorage.getItem(MEM_KEY);
-    if (!workspaceId || !memberId) { setState(s => ({ ...s, isLoading: false })); return; }
-    try {
-      const [{ data: ws }, { data: member }, { data: cats }, { data: mems }, blue] = await Promise.all([
-        supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
-        supabase.from('members').select('*').eq('id', memberId).single(),
-        supabase.from('categories').select('*').eq('workspace_id', workspaceId).order('sort_order'),
-        supabase.from('members').select('*').eq('workspace_id', workspaceId),
-        getBlueRate(),
-      ]);
-      setState({ workspace: ws, currentMember: member, members: mems ?? [], categories: cats ?? [], blueRate: blue, isAuthenticated: false, isLoading: false });
-    } catch { setState(s => ({ ...s, isLoading: false })); }
-  }
 
-  async function unlockWithPin(pin: string): Promise<boolean> {
-    if (!state.workspace) return false;
-    if (hashPin(pin) !== state.workspace.pin_hash) return false;
-    setState(s => ({ ...s, isAuthenticated: true }));
-    return true;
-  }
+    if (!workspaceId || !memberId) {
+      setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
+      return;
+    }
 
-  function lockApp() { setState(s => ({ ...s, isAuthenticated: false })); }
+    const [{ data: ws }, { data: member }, { data: cats }, { data: mems }, blue] = await Promise.all([
+      supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
+      supabase.from('members').select('*').eq('id', memberId).single(),
+      supabase.from('categories').select('*').eq('workspace_id', workspaceId).order('sort_order'),
+      supabase.from('members').select('*').eq('workspace_id', workspaceId),
+      getBlueRate(),
+    ]);
 
-  async function setupWorkspace(name: string, pin: string, displayName: string, currency: 'ARS' | 'USD') {
-    const pin_hash = hashPin(pin);
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: `gastly_${Date.now()}@gmail.com`,
-      password: `${pin}_gastly_${Date.now()}`,
+    setState({
+      workspace: ws, currentMember: member, members: mems ?? [],
+      categories: cats ?? [], blueRate: blue,
+      isAuthenticated: true, isLoading: false,
     });
-    if (authError || !authData.user) throw new Error(authError?.message ?? 'Auth error');
+  }
 
-    const { data: ws, error: wsErr } = await supabase.from('workspaces').insert({ name, pin_hash, default_currency: currency }).select().single();
+  async function login(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+    await loadUserData(data.user.id);
+  }
+
+  async function register(email: string, password: string) {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error('No se pudo crear el usuario');
+    setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    localStorage.removeItem(WS_KEY);
+    localStorage.removeItem(MEM_KEY);
+    setState({ workspace: null, currentMember: null, members: [], categories: [], blueRate: null, isAuthenticated: false, isLoading: false });
+  }
+
+  async function setupWorkspace(name: string, displayName: string, currency: 'ARS' | 'USD') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    const { data: ws, error: wsErr } = await supabase
+      .from('workspaces')
+      .insert({ name, pin_hash: '', default_currency: currency })
+      .select().single();
     if (wsErr || !ws) throw new Error(wsErr?.message);
 
-    const { data: member, error: memErr } = await supabase.from('members').insert({ workspace_id: ws.id, user_id: authData.user.id, display_name: displayName.toUpperCase().slice(0, 4), role: 'owner' }).select().single();
+    const { data: member, error: memErr } = await supabase
+      .from('members')
+      .insert({ workspace_id: ws.id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 4), role: 'owner' })
+      .select().single();
     if (memErr || !member) throw new Error(memErr?.message);
 
-    const { data: cats } = await supabase.from('categories').insert(DEFAULT_CATEGORIES.map(c => ({ ...c, workspace_id: ws.id, is_default: true }))).select();
+    const { data: cats } = await supabase
+      .from('categories')
+      .insert(DEFAULT_CATEGORIES.map(c => ({ ...c, workspace_id: ws.id, is_default: true })))
+      .select();
 
     localStorage.setItem(WS_KEY, ws.id);
     localStorage.setItem(MEM_KEY, member.id);
+
     const blue = await getBlueRate();
-    setState({ workspace: ws, currentMember: member, members: [member], categories: cats ?? [], blueRate: blue, isAuthenticated: true, isLoading: false });
+    setState(s => ({ ...s, workspace: ws, currentMember: member, members: [member], categories: cats ?? [], blueRate: blue }));
   }
 
   async function reloadCategories() {
@@ -104,7 +139,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ ...state, hasWorkspace: !!state.workspace, unlockWithPin, lockApp, setupWorkspace, reloadCategories, reloadMembers, refreshBlueRate }}>
+    <AppContext.Provider value={{
+      ...state,
+      hasWorkspace: !!state.workspace,
+      login, register, logout,
+      setupWorkspace, reloadCategories, reloadMembers, refreshBlueRate,
+    }}>
       {children}
     </AppContext.Provider>
   );

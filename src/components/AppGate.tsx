@@ -1,11 +1,11 @@
 'use client';
 import { ReactNode } from 'react';
 import { useApp } from '@/context/AppContext';
+import AuthScreen from './AuthScreen';
 import SetupScreen from './SetupScreen';
-import PinScreen from './PinScreen';
 
 export default function AppGate({ children }: { children: ReactNode }) {
-  const { isLoading, hasWorkspace, isAuthenticated } = useApp();
+  const { isLoading, isAuthenticated, hasWorkspace } = useApp();
 
   if (isLoading) {
     return (
@@ -16,7 +16,7 @@ export default function AppGate({ children }: { children: ReactNode }) {
     );
   }
 
+  if (!isAuthenticated) return <AuthScreen />;
   if (!hasWorkspace) return <SetupScreen />;
-  if (!isAuthenticated) return <PinScreen />;
   return <>{children}</>;
 }

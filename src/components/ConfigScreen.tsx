@@ -32,7 +32,7 @@ export default function ConfigScreen() {
 }
 
 function GeneralTab() {
-  const { workspace, members, lockApp, reloadMembers } = useApp();
+  const { workspace, members, logout, reloadMembers } = useApp();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -75,7 +75,7 @@ function GeneralTab() {
         )}
       </section>
 
-      <button className="danger-btn" onClick={lockApp}>Bloquear app</button>
+      <button className="danger-btn" onClick={logout}>Cerrar sesión</button>
 
       <style jsx>{`
         .content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }

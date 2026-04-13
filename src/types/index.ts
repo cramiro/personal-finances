@@ -3,7 +3,7 @@ export type Currency = 'ARS' | 'USD';
 export interface Workspace {
   id: string;
   name: string;
-  pin_hash: string;
+  pin_hash: string | null;
   default_currency: Currency;
   created_at: string;
 }
