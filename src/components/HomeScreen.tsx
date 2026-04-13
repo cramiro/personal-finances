@@ -85,6 +85,7 @@ export default function HomeScreen() {
 
   return (
     <div className="home">
+      {workspace && <p className="ws-name">{workspace.name}</p>}
       <form onSubmit={handleConfirm} className="card">
         <input
           className="big-input"
@@ -156,6 +157,7 @@ export default function HomeScreen() {
 
       <style jsx>{`
         .home { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .ws-name { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; margin: 4px 0 0; }
         .card { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; }
         .big-input { font-size: 20px; color: var(--text); border: none; border-bottom: 1.5px solid var(--border); padding: 8px 0 12px; width: 100%; background: transparent; }
         .big-input:focus { border-bottom-color: var(--primary); }
