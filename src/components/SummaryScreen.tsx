@@ -28,6 +28,7 @@ export default function SummaryScreen() {
   const [showUSD, setShowUSD] = useState(false);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [drillCat, setDrillCat] = useState<{id: string; name: string; color: string} | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!workspace) return;
@@ -72,20 +73,31 @@ export default function SummaryScreen() {
   let y=sy, m=sm;
   while (y<ey||(y===ey&&m<=em)) { range.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
 
+  // Reset selectedMonth when range changes
+  useEffect(() => { setSelectedMonth(null); }, [from, to, memberId]);
+
   const chartData = range.map(mo => {
     const sum = expenses.filter(e => e.date.startsWith(mo)).reduce((s,e) => s+toDisplay(e),0);
     const label = new Date(`${mo}-01`).toLocaleString('es-AR',{month:'short'}).replace('.','');
-    return { month: label, total: Math.round(sum) };
+    return { monthKey: mo, month: label, total: Math.round(sum) };
   });
 
-  // Category breakdown
+  // Category breakdown — filtered by selectedMonth if set
+  const catExpenses = selectedMonth ? expenses.filter(e => e.date.startsWith(selectedMonth)) : expenses;
   const catMap: Record<string,{name:string;color:string;total:number}> = {};
-  expenses.forEach(e => {
+  catExpenses.forEach(e => {
     const cat = e.categories as any;
-    if (!catMap[e.category_id]) catMap[e.category_id] = { name: cat?.name??'Otros', color: cat?.color??'#888', total: 0 };
-    catMap[e.category_id].total += toDisplay(e);
+    const key = e.category_id ?? '__null__';
+    const name = cat?.name ?? 'Sin categoría';
+    const color = cat?.color ?? '#888780';
+    if (!catMap[key]) catMap[key] = { name, color, total: 0 };
+    catMap[key].total += toDisplay(e);
   });
   const breakdown = Object.values(catMap).sort((a,b)=>b.total-a.total);
+
+  const catPeriodLabel = selectedMonth
+    ? new Date(`${selectedMonth}-01`).toLocaleString('es-AR', { month: 'long', year: '2-digit' }).replace('.','')
+    : null;
 
   return (
     <div className="wrap">
@@ -125,12 +137,21 @@ export default function SummaryScreen() {
             <div className="chart-card">
               <p className="section-label">Por mes</p>
               <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={chartData} margin={{top:4,right:4,bottom:0,left:0}}>
+                <BarChart data={chartData} margin={{top:4,right:4,bottom:0,left:0}}
+                  onClick={(d) => {
+                    if (!d?.activePayload?.[0]) return;
+                    const mk = d.activePayload[0].payload.monthKey;
+                    setSelectedMonth(prev => prev === mk ? null : mk);
+                  }}
+                  style={{cursor:'pointer'}}
+                >
                   <XAxis dataKey="month" tick={{fontSize:12,fill:'#6B6B6B'}} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip formatter={(v)=>formatAmount(Number(v),displayCur)} cursor={{fill:'#f0f0ee'}} />
                   <Bar dataKey="total" radius={[6,6,0,0]}>
-                    {chartData.map((_,i)=><Cell key={i} fill="#1D9E75" />)}
+                    {chartData.map((d,i)=>(
+                      <Cell key={i} fill={selectedMonth && selectedMonth !== d.monthKey ? '#b2d8cc' : '#1D9E75'} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -140,9 +161,16 @@ export default function SummaryScreen() {
           {/* Category breakdown */}
           {breakdown.length > 0 && (
             <div className="section">
-              <p className="section-label">Por categoría</p>
+              <div className="section-header">
+                <p className="section-label">Por categoría</p>
+                {catPeriodLabel
+                  ? <button className="period-badge" onClick={() => setSelectedMonth(null)}>{catPeriodLabel} ✕</button>
+                  : <span className="period-badge period-badge--muted">rango completo</span>
+                }
+              </div>
               {breakdown.map((c,i) => {
-                const catId = Object.keys(catMap).find(k => catMap[k] === c) ?? '';
+                const catKey = Object.keys(catMap).find(k => catMap[k] === c) ?? '';
+                const catId = catKey === '__null__' ? '' : catKey;
                 return (
                   <button key={i} className="cat-row cat-row--btn" onClick={() => setDrillCat({id: catId, name: c.name, color: c.color})}>
                     <span className="cat-dot" style={{background:c.color}} />
@@ -188,7 +216,10 @@ export default function SummaryScreen() {
         .pill--active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
         .chart-card { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
         .section { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-        .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px; }
+        .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+        .period-badge { border: none; background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; cursor: pointer; }
+        .period-badge--muted { background: var(--bg); color: var(--text-tertiary); cursor: default; }
         .cat-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
         .cat-row--btn { width: 100%; border: none; background: none; padding: 0; cursor: pointer; text-align: left; border-radius: 8px; transition: background 0.1s; }
         .cat-row--btn:hover { background: var(--bg); }
@@ -213,7 +244,7 @@ function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur,
   onClose: () => void;
 }) {
   const items = expenses
-    .filter(e => e.category_id === catId)
+    .filter(e => catId ? e.category_id === catId : !e.category_id)
     .sort((a, b) => toDisplay(b) - toDisplay(a));
 
   function fmtDate(d: string) {
