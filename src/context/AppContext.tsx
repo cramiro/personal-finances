@@ -91,10 +91,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const device = parseDevice(navigator.userAgent);
       let location = 'Desconocida';
       try {
-        const res = await fetch('https://ip-api.com/json/?fields=city,country,status', { signal: AbortSignal.timeout(4000) });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.status === 'success') location = `${json.city}, ${json.country}`;
+        const GEO_KEY = 'gastly_geo';
+        const GEO_AT_KEY = 'gastly_geo_at';
+        const cached = localStorage.getItem(GEO_KEY);
+        const cachedAt = Number(localStorage.getItem(GEO_AT_KEY) ?? 0);
+        if (cached && Date.now() - cachedAt < 86_400_000) {
+          location = cached;
+        } else {
+          const res = await fetch('https://ip-api.com/json/?fields=city,country,status', { signal: AbortSignal.timeout(4000) });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.status === 'success') {
+              location = `${json.city}, ${json.country}`;
+              localStorage.setItem(GEO_KEY, location);
+              localStorage.setItem(GEO_AT_KEY, String(Date.now()));
+            }
+          }
         }
       } catch { /* ignore geo errors */ }
       const now = new Date().toISOString();
