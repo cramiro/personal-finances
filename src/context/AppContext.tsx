@@ -51,19 +51,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function loadUserData(userId: string) {
-    const workspaceId = localStorage.getItem(WS_KEY);
-    const memberId = localStorage.getItem(MEM_KEY);
+    // Always look up the member by user_id from the DB (works across devices)
+    const { data: member } = await supabase
+      .from('members')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single();
 
-    if (!workspaceId || !memberId) {
+    if (!member) {
       setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
       return;
     }
 
-    const [{ data: ws }, { data: member }, { data: cats }, { data: mems }, blue] = await Promise.all([
-      supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
-      supabase.from('members').select('*').eq('id', memberId).single(),
-      supabase.from('categories').select('*').eq('workspace_id', workspaceId).order('sort_order'),
-      supabase.from('members').select('*').eq('workspace_id', workspaceId),
+    // Persist to localStorage for faster future loads
+    localStorage.setItem(WS_KEY, member.workspace_id);
+    localStorage.setItem(MEM_KEY, member.id);
+
+    const [{ data: ws }, { data: cats }, { data: mems }, blue] = await Promise.all([
+      supabase.from('workspaces').select('*').eq('id', member.workspace_id).single(),
+      supabase.from('categories').select('*').eq('workspace_id', member.workspace_id).order('sort_order'),
+      supabase.from('members').select('*').eq('workspace_id', member.workspace_id),
       getBlueRate(),
     ]);
 
