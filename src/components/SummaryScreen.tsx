@@ -137,14 +137,7 @@ export default function SummaryScreen() {
             <div className="chart-card">
               <p className="section-label">Por mes</p>
               <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={chartData} margin={{top:4,right:4,bottom:0,left:0}}
-                  onClick={(d: any) => {
-                    if (!d?.activePayload?.[0]) return;
-                    const mk = d.activePayload[0].payload.monthKey;
-                    setSelectedMonth((prev: string | null) => prev === mk ? null : mk);
-                  }}
-                  style={{cursor:'pointer'}}
-                >
+                <BarChart data={chartData} margin={{top:4,right:4,bottom:0,left:0}} style={{cursor:'pointer'}}>
                   <XAxis dataKey="month" tick={{fontSize:12,fill:'#6B6B6B'}} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip
@@ -157,12 +150,15 @@ export default function SummaryScreen() {
                         <div className="tt-box">
                           <p className="tt-month">{label}</p>
                           <p className="tt-total">{formatAmount(Number(payload[0].value), displayCur)}</p>
-                          <p className="tt-action">{isActive ? '✕ filtro activo' : 'tocá la barra para ver detalle'}</p>
+                          <p className="tt-action">{isActive ? '✕ quitar filtro' : 'ver detalle →'}</p>
                         </div>
                       );
                     }}
                   />
-                  <Bar dataKey="total" radius={[6,6,0,0]}>
+                  <Bar dataKey="total" radius={[6,6,0,0]} onClick={(data: any) => {
+                    const mk = data.monthKey;
+                    setSelectedMonth((prev: string | null) => prev === mk ? null : mk);
+                  }}>
                     {chartData.map((d,i)=>(
                       <Cell key={i} fill={selectedMonth && selectedMonth !== d.monthKey ? '#b2d8cc' : '#1D9E75'} />
                     ))}
