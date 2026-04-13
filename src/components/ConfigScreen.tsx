@@ -4,6 +4,7 @@ import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { Category } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
+import { parseExpense } from '@/lib/parser';
 
 type Tab = 'general' | 'categories';
 
@@ -140,9 +141,10 @@ function CategoriesTab() {
       .eq('workspace_id', workspace.id)
       .gte('date', yearStart);
 
+    // Use the same matching rules as the parser (count, then length, then order)
     const matching = (expenses ?? []).filter(e => {
-      const desc = e.description.toLowerCase();
-      return savedCat.keywords.some(kw => desc.includes(kw));
+      const parsed = parseExpense(e.description, categories, workspace.default_currency);
+      return parsed.categoryId === savedCat.id;
     });
 
     if (matching.length > 0) {
