@@ -12,6 +12,7 @@ export default function HomeScreen() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const parsed = parseExpense(input, categories, workspace?.default_currency ?? 'ARS');
   const hasInput = input.trim().length > 0;
@@ -29,6 +30,13 @@ export default function HomeScreen() {
   }, [workspace]);
 
   useEffect(() => { loadRecents(); }, [loadRecents]);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    function close() { setOpenMenu(null); }
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [openMenu]);
 
   async function handleConfirm(e: React.FormEvent) {
     e.preventDefault();
@@ -53,6 +61,7 @@ export default function HomeScreen() {
   }
 
   async function handleDelete(id: string) {
+    setOpenMenu(null);
     if (!confirm('¿Eliminar este gasto?')) return;
     await supabase.from('expenses').delete().eq('id', id);
     loadRecents();
@@ -113,9 +122,14 @@ export default function HomeScreen() {
                 <span className="exp-time">{timeAgo(e.created_at)}</span>
               </div>
               {isOwner && (
-                <div className="actions">
-                  <button className="action-btn" onClick={() => setEditing(e)} title="Editar">✏️</button>
-                  <button className="action-btn danger" onClick={() => handleDelete(e.id)} title="Eliminar">🗑</button>
+                <div className="menu-wrap">
+                  <button className="menu-trigger" onClick={() => setOpenMenu(openMenu === e.id ? null : e.id)}>···</button>
+                  {openMenu === e.id && (
+                    <div className="menu-dropdown">
+                      <button className="menu-item" onClick={() => { setOpenMenu(null); setEditing(e); }}>Editar</button>
+                      <button className="menu-item menu-item--danger" onClick={() => handleDelete(e.id)}>Eliminar</button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -154,9 +168,13 @@ export default function HomeScreen() {
         .exp-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
         .exp-amount { font-size: 14px; font-weight: 700; color: var(--text); }
         .exp-time { font-size: 11px; color: var(--text-tertiary); }
-        .actions { display: flex; gap: 4px; margin-left: 4px; }
-        .action-btn { border: none; background: none; font-size: 15px; padding: 4px; cursor: pointer; border-radius: 6px; opacity: 0.6; transition: opacity 0.15s; }
-        .action-btn:hover { opacity: 1; }
+        .menu-wrap { position: relative; flex-shrink: 0; }
+        .menu-trigger { border: none; background: none; font-size: 18px; font-weight: 700; color: var(--text-tertiary); padding: 4px 6px; cursor: pointer; border-radius: 6px; line-height: 1; letter-spacing: 1px; }
+        .menu-trigger:hover { color: var(--text-secondary); }
+        .menu-dropdown { position: absolute; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 50; min-width: 110px; overflow: hidden; }
+        .menu-item { display: block; width: 100%; text-align: left; border: none; background: none; padding: 11px 14px; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+        .menu-item:hover { background: var(--bg); }
+        .menu-item--danger { color: var(--danger); }
         .empty { color: var(--text-tertiary); font-size: 14px; text-align: center; padding: 32px 0; margin: 0; }
       `}</style>
     </div>
