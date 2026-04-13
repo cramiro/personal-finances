@@ -24,6 +24,7 @@ interface AppCtx extends AppState {
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setupWorkspace: (name: string, displayName: string, currency: 'ARS' | 'USD') => Promise<void>;
+  joinWorkspace: (code: string, displayName: string) => Promise<void>;
   reloadCategories: () => Promise<void>;
   reloadMembers: () => Promise<void>;
   refreshBlueRate: () => Promise<void>;
@@ -121,6 +122,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, workspace: ws, currentMember: member, members: [member], categories: cats ?? [], blueRate: blue }));
   }
 
+  async function joinWorkspace(code: string, displayName: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No autenticado');
+
+    // code is the workspace id
+    const { data: ws, error: wsErr } = await supabase
+      .from('workspaces').select('*').eq('id', code.trim()).single();
+    if (wsErr || !ws) throw new Error('Código inválido — verificá que esté bien escrito');
+
+    const { data: member, error: memErr } = await supabase
+      .from('members')
+      .insert({ workspace_id: ws.id, user_id: user.id, display_name: displayName.toUpperCase().slice(0, 4), role: 'member' })
+      .select().single();
+    if (memErr || !member) throw new Error(memErr?.message);
+
+    const [{ data: cats }, { data: mems }, blue] = await Promise.all([
+      supabase.from('categories').select('*').eq('workspace_id', ws.id).order('sort_order'),
+      supabase.from('members').select('*').eq('workspace_id', ws.id),
+      getBlueRate(),
+    ]);
+
+    localStorage.setItem(WS_KEY, ws.id);
+    localStorage.setItem(MEM_KEY, member.id);
+    setState(s => ({ ...s, workspace: ws, currentMember: member, members: mems ?? [], categories: cats ?? [], blueRate: blue }));
+  }
+
   async function reloadCategories() {
     if (!state.workspace) return;
     const { data } = await supabase.from('categories').select('*').eq('workspace_id', state.workspace.id).order('sort_order');
@@ -143,7 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state,
       hasWorkspace: !!state.workspace,
       login, register, logout,
-      setupWorkspace, reloadCategories, reloadMembers, refreshBlueRate,
+      setupWorkspace, joinWorkspace, reloadCategories, reloadMembers, refreshBlueRate,
     }}>
       {children}
     </AppContext.Provider>

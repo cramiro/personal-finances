@@ -32,22 +32,14 @@ export default function ConfigScreen() {
 }
 
 function GeneralTab() {
-  const { workspace, members, logout, reloadMembers } = useApp();
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState('');
+  const { workspace, members, logout } = useApp();
+  const [copied, setCopied] = useState(false);
 
-  async function addMember() {
-    if (!workspace || !newName.trim()) return;
-    const { data: authData } = await supabase.auth.signUp({
-      email: `gastly_${Date.now()}@gastly.app`,
-      password: `member_${Date.now()}`,
-    });
-    if (!authData.user) return;
-    await supabase.from('members').insert({
-      workspace_id: workspace.id, user_id: authData.user.id,
-      display_name: newName.trim().toUpperCase().slice(0,4), role: 'member',
-    });
-    setNewName(''); setAdding(false); reloadMembers();
+  function copyCode() {
+    if (!workspace) return;
+    navigator.clipboard.writeText(workspace.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -59,20 +51,23 @@ function GeneralTab() {
       </section>
 
       <section className="card">
-        <div className="card-header">
-          <h3 className="card-title">Miembros</h3>
-          <button className="link-btn" onClick={()=>setAdding(v=>!v)}>+ Agregar</button>
-        </div>
+        <h3 className="card-title">Miembros</h3>
         {members.map(m=><Row key={m.id} label={m.display_name} value={m.role==='owner'?'owner':'miembro'} />)}
-        {adding && (
-          <div className="add-row">
-            <input className="input" placeholder="Nombre corto (ej: JP)" value={newName} onChange={e=>setNewName(e.target.value)} maxLength={4} style={{textTransform:'uppercase'}} autoFocus />
-            <div style={{display:'flex',gap:8,marginTop:8}}>
-              <button className="btn-primary sm" onClick={addMember}>Guardar</button>
-              <button className="btn-ghost sm" onClick={()=>setAdding(false)}>Cancelar</button>
-            </div>
-          </div>
-        )}
+      </section>
+
+      <section className="card">
+        <h3 className="card-title">Código de invitación</h3>
+        <p style={{fontSize:13,color:'var(--text-secondary)',margin:'0 0 10px',lineHeight:1.5}}>
+          Compartí este código para que otros puedan unirse a tu workspace.
+        </p>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <code style={{flex:1,background:'var(--bg)',border:'1.5px solid var(--border)',borderRadius:8,padding:'10px 12px',fontSize:11,color:'var(--text-secondary)',wordBreak:'break-all'}}>
+            {workspace?.id}
+          </code>
+          <button className="btn-primary sm" onClick={copyCode} style={{flexShrink:0}}>
+            {copied ? '✓' : 'Copiar'}
+          </button>
+        </div>
       </section>
 
       <button className="danger-btn" onClick={logout}>Cerrar sesión</button>
