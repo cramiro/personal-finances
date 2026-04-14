@@ -212,7 +212,7 @@ export default function SummaryScreen() {
                     <LabelList
                       dataKey="total"
                       position="top"
-                      formatter={(v: number) => fmtShort(v, displayCur)}
+                      formatter={(v: unknown) => fmtShort(Number(v), displayCur)}
                       style={{ fontSize: 11, fontWeight: 700, fill: '#6B6B6B' }}
                     />
                     {chartData.map((d,i)=>(
