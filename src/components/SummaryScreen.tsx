@@ -136,7 +136,7 @@ export default function SummaryScreen() {
   }, [expenses, selectedMonth, displayAmounts]);
 
   const catPeriodLabel = selectedMonth
-    ? new Date(`${selectedMonth}-01`).toLocaleString('es-AR', { month: 'long', year: '2-digit' }).replace('.','')
+    ? new Date(`${selectedMonth}-02T12:00:00Z`).toLocaleString('es-AR', { month: 'long', year: '2-digit' }).replace('.','')
     : null;
 
   return (
