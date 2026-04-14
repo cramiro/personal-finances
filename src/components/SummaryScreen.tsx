@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { formatAmount } from '@/lib/parser';
@@ -19,7 +19,17 @@ function getMonths() {
   return out;
 }
 const MONTHS = getMonths();
-const BAR_MARGIN = { top: 4, right: 4, bottom: 0, left: 0 };
+const BAR_MARGIN = { top: 24, right: 4, bottom: 0, left: 4 };
+
+function fmtShort(value: number, cur: Currency): string {
+  if (cur === 'USD') {
+    if (value >= 1000) return `U$${(value / 1000).toFixed(1).replace('.0', '')}K`;
+    return `U$${Math.round(value)}`;
+  }
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace('.0', '')}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+  return `$${Math.round(value)}`;
+}
 
 export default function SummaryScreen() {
   const { workspace, members, categories, currentMember, blueRate, refreshBlueRate } = useApp();
@@ -176,7 +186,7 @@ export default function SummaryScreen() {
           {chartData.some(d=>d.total>0) && (
             <div className="chart-card">
               <p className="section-label">Por mes</p>
-              <ResponsiveContainer width="100%" height={160}>
+              <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} margin={BAR_MARGIN} style={{cursor:'pointer'}}>
                   <XAxis dataKey="month" tick={{fontSize:12,fill:'#6B6B6B'}} axisLine={false} tickLine={false} />
                   <YAxis hide />
@@ -199,6 +209,12 @@ export default function SummaryScreen() {
                     const mk = data.monthKey;
                     setSelectedMonth((prev: string | null) => prev === mk ? null : mk);
                   }}>
+                    <LabelList
+                      dataKey="total"
+                      position="top"
+                      formatter={(v: number) => fmtShort(v, displayCur)}
+                      style={{ fontSize: 11, fontWeight: 700, fill: '#6B6B6B' }}
+                    />
                     {chartData.map((d,i)=>(
                       <Cell key={i} fill={selectedMonth && selectedMonth !== d.monthKey ? '#b2d8cc' : '#1D9E75'} />
                     ))}
