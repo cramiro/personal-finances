@@ -11,11 +11,11 @@ type Tab = 'general' | 'categories';
 const COLORS = ['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#E24B4A','#639922','#534AB7','#888780'];
 
 export default function ConfigScreen() {
-  const [tab, setTab] = useState<Tab>('general');
+  const [tab, setTab] = useState<Tab>('categories');
   return (
     <div className="wrap">
       <div className="tabs">
-        {(['general','categories'] as Tab[]).map(t => (
+        {(['categories','general'] as Tab[]).map(t => (
           <button key={t} className={`tab ${tab===t?'tab--active':''}`} onClick={()=>setTab(t)}>
             {t==='general'?'General':'Categorías'}
           </button>
