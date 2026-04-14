@@ -234,9 +234,11 @@ export default function SummaryScreen() {
                   : <button className="period-badge period-badge--muted" disabled>todo el período</button>
                 }
               </div>
-              {breakdown.map((c,i) => {
+              {(() => {
+                const breakdownTotal = breakdown.reduce((s, c) => s + c.total, 0);
+                return breakdown.map((c,i) => {
                 const catId = c.key === '__null__' ? '' : c.key;
-                const pct = total > 0 ? c.total / total * 100 : 0;
+                const pct = breakdownTotal > 0 ? c.total / breakdownTotal * 100 : 0;
                 const pctLabel = pct < 1 ? '<1%' : `${Math.round(pct)}%`;
                 return (
                   <button key={i} className="cat-row cat-row--btn" onClick={() => setDrillCat({id: catId, name: c.name, color: c.color})}>
@@ -249,7 +251,7 @@ export default function SummaryScreen() {
                     <span className="cat-pct">{pctLabel}</span>
                   </button>
                 );
-              })}
+              })})()}
             </div>
           )}
 
