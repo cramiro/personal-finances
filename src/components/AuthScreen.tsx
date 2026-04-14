@@ -127,12 +127,14 @@ export default function AuthScreen() {
             onClick={() => setStep('pin')}
             disabled={!isValidEmail(email)}
           >
-            Continuar →
+            {mode === 'login' ? 'Entrar' : 'Crear cuenta'}
           </button>
-          <button className="toggle-btn" onClick={toggleMode}>
-            {mode === 'login'
-              ? '¿Primera vez? Crear cuenta'
-              : '¿Ya tenés cuenta? Iniciar sesión'}
+          <button
+            className="btn btn--secondary"
+            onClick={() => { toggleMode(); }}
+            disabled={!isValidEmail(email)}
+          >
+            {mode === 'login' ? 'Crear cuenta' : 'Ya tengo cuenta'}
           </button>
         </div>
       ) : (
@@ -150,7 +152,16 @@ export default function AuthScreen() {
             ))}
           </div>
 
-          {error && <p className="error error--center">{error}</p>}
+          {error && (
+            <div className="error-block">
+              <p className="error error--center">{error}</p>
+              {mode === 'login' && (
+                <button className="recovery-btn" onClick={() => { setMode('register'); setPin(''); setError(''); }}>
+                  ¿No tenés cuenta? Crear cuenta →
+                </button>
+              )}
+            </div>
+          )}
 
           {loading ? (
             <div className="loading">
@@ -186,7 +197,9 @@ export default function AuthScreen() {
         .input:focus { border-color: var(--primary); outline: none; }
         .btn { background: var(--primary); color: white; border: none; border-radius: 12px; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .toggle-btn { background: none; border: none; color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 0; text-align: center; }
+        .btn--secondary { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
+        .error-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .recovery-btn { background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
         /* pin step */
         .pin-wrap { display: flex; flex-direction: column; align-items: center; }
         .back-btn { background: none; border: none; color: var(--text-secondary); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; padding: 0; cursor: pointer; align-self: flex-start; margin-bottom: 32px; }
