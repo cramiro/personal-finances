@@ -258,7 +258,7 @@ export default function SummaryScreen() {
               catId={drillCat.id}
               catName={drillCat.name}
               catColor={drillCat.color}
-              expenses={expenses}
+              expenses={selectedMonth ? expenses.filter(e => e.date.startsWith(selectedMonth)) : expenses}
               toDisplay={toDisplay}
               displayCur={displayCur}
               isOwner={isOwner}
