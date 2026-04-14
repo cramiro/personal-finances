@@ -296,7 +296,7 @@ function CategoryPickerSheet({ categories, workspaceId, selectedId, onSelect, on
         .divider { height: 1px; background: var(--border); margin: 8px 0; }
         .new-cat-btn { background: none; border: none; padding: 10px 8px; font-size: 14px; font-weight: 700; color: var(--primary); cursor: pointer; text-align: left; width: 100%; }
         .new-cat-form { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
-        .name-input { border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 15px; color: var(--text); width: 100%; font-family: inherit; background: var(--surface); }
+        .name-input { border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--text); width: 100%; font-family: inherit; background: var(--surface); }
         .name-input:focus { border-color: var(--primary); outline: none; }
         .color-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }

@@ -114,7 +114,7 @@ export default function ExpenseDetailModal({ expense, categories, isOwner, displ
         .btn-primary:disabled { opacity: 0.6; }
         .modal-title { font-size: 18px; font-weight: 700; margin: 0; }
         .label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
-        .input { border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 15px; color: var(--text); width: 100%; font-family: inherit; background: var(--surface); }
+        .input { border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--text); width: 100%; font-family: inherit; background: var(--surface); }
         .input:focus { border-color: var(--primary); outline: none; }
         .amount-row { display: flex; gap: 8px; align-items: center; }
         .amount-row .input { flex: 1; }
