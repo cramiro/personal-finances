@@ -231,19 +231,22 @@ export default function SummaryScreen() {
                 <p className="section-label">Por categoría</p>
                 {catPeriodLabel
                   ? <button className="period-badge" onClick={() => setSelectedMonth(null)}>{catPeriodLabel} ✕</button>
-                  : <span className="period-badge period-badge--muted">rango completo</span>
+                  : <button className="period-badge period-badge--muted" disabled>todo el período</button>
                 }
               </div>
               {breakdown.map((c,i) => {
                 const catId = c.key === '__null__' ? '' : c.key;
+                const pct = total > 0 ? c.total / total * 100 : 0;
+                const pctLabel = pct < 1 ? '<1%' : `${Math.round(pct)}%`;
                 return (
                   <button key={i} className="cat-row cat-row--btn" onClick={() => setDrillCat({id: catId, name: c.name, color: c.color})}>
                     <span className="cat-dot" style={{background:c.color}} />
                     <span className="cat-name">{c.name}</span>
                     <div className="bar-bg">
-                      <div className="bar-fill" style={{width:`${Math.min(100,(c.total/total)*100)}%`,background:c.color}} />
+                      <div className="bar-fill" style={{width:`${Math.min(100,pct)}%`,background:c.color}} />
                     </div>
                     <span className="cat-amount">{formatAmount(c.total,displayCur)}</span>
+                    <span className="cat-pct">{pctLabel}</span>
                   </button>
                 );
               })}
@@ -292,7 +295,7 @@ export default function SummaryScreen() {
         .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
         .period-badge { border: none; background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; cursor: pointer; }
-        .period-badge--muted { background: var(--bg); color: var(--text-tertiary); cursor: default; }
+        .period-badge--muted { background: var(--bg); color: var(--text-tertiary); cursor: default; border: 1.5px solid var(--border); }
         .cat-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
         .cat-row--btn { width: 100%; border: none; background: none; padding: 0; cursor: pointer; text-align: left; border-radius: 8px; transition: background 0.1s; }
         .cat-row--btn:hover { background: var(--bg); }
@@ -301,6 +304,7 @@ export default function SummaryScreen() {
         .bar-bg { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
         .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
         .cat-amount { font-size: 13px; font-weight: 700; color: var(--text); min-width: 80px; text-align: right; }
+        .cat-pct { font-size: 11px; font-weight: 600; color: var(--text-tertiary); min-width: 28px; text-align: right; }
         .empty { text-align: center; color: var(--text-tertiary); padding: 40px 0; margin: 0; }
       `}</style>
     </div>
