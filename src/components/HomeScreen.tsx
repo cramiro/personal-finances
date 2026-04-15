@@ -96,7 +96,7 @@ export default function HomeScreen() {
       <form onSubmit={handleConfirm} className="card">
         <input
           className="big-input"
-          placeholder='"10k super" o "50usd netflix"'
+          placeholder='"100k super" o "25k café"'
           value={input}
           onChange={e => setInput(e.target.value)}
           autoComplete="off"
