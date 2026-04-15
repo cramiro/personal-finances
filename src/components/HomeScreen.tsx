@@ -269,10 +269,9 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
   }
 
   async function clearCompleted() {
-    await supabase.from('shopping_items')
-      .delete()
-      .eq('workspace_id', workspaceId)
-      .not('completed_at', 'is', null);
+    const ids = completed.map(i => i.id);
+    if (ids.length === 0) return;
+    await supabase.from('shopping_items').delete().in('id', ids);
     loadItems();
   }
 
