@@ -288,12 +288,12 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
 
   return (
     <>
-      <button className="section-toggle" onClick={() => setOpen(v => !v)}>
-        <span className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          🛒 Lista de compras
+      <button className="shop-toggle" onClick={() => setOpen(v => !v)}>
+        <span className="shop-toggle-label">
+          Lista de compras
           {pending.length > 0 && <span className="shop-badge">{pending.length}</span>}
         </span>
-        <svg className={`chevron ${open ? 'chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <svg className={`shop-chevron ${open ? 'shop-chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
@@ -344,6 +344,10 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
       )}
 
       <style jsx>{`
+        .shop-toggle { display: flex; align-items: center; justify-content: space-between; background: none; border: none; padding: 4px 0; cursor: pointer; width: 100%; }
+        .shop-toggle-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .shop-chevron { color: var(--text-tertiary); transition: transform 0.2s; flex-shrink: 0; }
+        .shop-chevron--up { transform: rotate(180deg); }
         .shop-badge { background: var(--primary); color: white; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; line-height: 1.6; }
         .shop-panel { background: var(--surface); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }
         .shop-add { display: flex; gap: 8px; margin-bottom: 8px; }
