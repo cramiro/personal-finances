@@ -242,14 +242,19 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     const name = newItem.trim();
     if (!name) return;
     setSaving(true);
-    await supabase.from('shopping_items').insert({
-      workspace_id: workspaceId,
-      created_by: currentMember.id,
-      name,
-    });
-    setNewItem('');
-    setSaving(false);
-    loadItems();
+    try {
+      const { error } = await supabase.from('shopping_items').insert({
+        workspace_id: workspaceId,
+        created_by: currentMember.id,
+        name,
+      });
+      if (!error) {
+        setNewItem('');
+        loadItems();
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function toggleItem(item: ShoppingItem) {
@@ -307,7 +312,7 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
               onChange={e => setNewItem(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
             />
-            <button className="shop-add-btn" onClick={addItem} disabled={saving || !newItem.trim()}>→</button>
+            <button type="button" className="shop-add-btn" onClick={addItem} disabled={saving || !newItem.trim()}>→</button>
           </div>
 
           {items.length === 0 && <p className="shop-empty">La lista está vacía</p>}
