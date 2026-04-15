@@ -9,6 +9,14 @@ import ExpenseDetailModal from '@/components/ExpenseDetailModal';
 
 const CAT_COLORS = ['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#E24B4A','#639922','#534AB7','#888780'];
 
+function timeAgo(d: string) {
+  const diff = (Date.now() - new Date(d).getTime()) / 1000;
+  if (diff < 60) return 'ahora';
+  if (diff < 3600) return `${Math.floor(diff/60)}m`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h`;
+  return `${Math.floor(diff/86400)}d`;
+}
+
 export default function HomeScreen() {
   const { workspace, currentMember, members, categories, reloadCategories } = useApp();
   const [input, setInput] = useState('');
@@ -30,9 +38,13 @@ export default function HomeScreen() {
   useEffect(() => { setOverrideCategoryId(null); }, [input]);
 
   const activeCategoryId = overrideCategoryId ?? parsed.categoryId;
-  const activeCategory = categories.find(c => c.id === activeCategoryId);
-  const activeCategoryName  = activeCategory?.name  ?? parsed.categoryName;
-  const activeCategoryColor = activeCategory?.color ?? parsed.categoryColor;
+  const { activeCategoryName, activeCategoryColor } = useMemo(() => {
+    const cat = categories.find(c => c.id === activeCategoryId);
+    return {
+      activeCategoryName:  cat?.name  ?? parsed.categoryName,
+      activeCategoryColor: cat?.color ?? parsed.categoryColor,
+    };
+  }, [activeCategoryId, categories, parsed.categoryName, parsed.categoryColor]);
   const isOwner = currentMember?.role === 'owner';
 
   const loadRecents = useCallback(async () => {
@@ -76,14 +88,6 @@ export default function HomeScreen() {
       setTimeout(() => setSavedMsg(false), 2000);
       loadRecents();
     }
-  }
-
-  function timeAgo(d: string) {
-    const diff = (Date.now() - new Date(d).getTime()) / 1000;
-    if (diff < 60) return 'ahora';
-    if (diff < 3600) return `${Math.floor(diff/60)}m`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h`;
-    return `${Math.floor(diff/86400)}d`;
   }
 
   return (
@@ -249,18 +253,14 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
   }
 
   async function toggleItem(item: ShoppingItem) {
-    if (!item.completed_at) {
-      await supabase.from('shopping_items').update({
-        completed_at: new Date().toISOString(),
-        completed_by: currentMember.id,
-      }).eq('id', item.id);
-    } else {
-      await supabase.from('shopping_items').update({
-        completed_at: null,
-        completed_by: null,
-      }).eq('id', item.id);
-    }
-    loadItems();
+    const now = new Date().toISOString();
+    const patch = item.completed_at
+      ? { completed_at: null, completed_by: null }
+      : { completed_at: now, completed_by: currentMember.id };
+    // Optimistic update — UI responds instantly
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...patch } : i));
+    // Persist in background
+    supabase.from('shopping_items').update(patch).eq('id', item.id).then(() => loadItems());
   }
 
   async function deleteItem(id: string) {
@@ -281,8 +281,10 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     return members.find(m => m.id === id)?.display_name ?? '?';
   }
 
-  const pending = items.filter(i => !i.completed_at);
-  const completed = items.filter(i => i.completed_at);
+  const { pending, completed } = useMemo(() => ({
+    pending:   items.filter(i => !i.completed_at),
+    completed: items.filter(i =>  i.completed_at),
+  }), [items]);
 
   return (
     <>

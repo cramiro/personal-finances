@@ -313,6 +313,10 @@ export default function SummaryScreen() {
   );
 }
 
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+}
+
 function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur, isOwner, categories, onClose, onReload }: {
   catId: string;
   catName: string;
@@ -327,13 +331,12 @@ function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur,
 }) {
   const [selected, setSelected] = useState<Expense | null>(null);
 
-  const items = expenses
-    .filter(e => catId ? e.category_id === catId : !e.category_id)
-    .sort((a, b) => toDisplay(b) - toDisplay(a));
-
-  function fmtDate(d: string) {
-    return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
-  }
+  const items = useMemo(
+    () => expenses
+      .filter(e => catId ? e.category_id === catId : !e.category_id)
+      .sort((a, b) => toDisplay(b) - toDisplay(a)),
+    [expenses, catId, toDisplay]
+  );
 
   return (
     <>
