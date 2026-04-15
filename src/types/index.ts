@@ -6,6 +6,17 @@ export interface Workspace {
   pin_hash: string | null;
   default_currency: Currency;
   created_at: string;
+  show_shopping_list: boolean;
+}
+
+export interface ShoppingItem {
+  id: string;
+  workspace_id: string;
+  created_by: string;
+  completed_by: string | null;
+  name: string;
+  completed_at: string | null;
+  created_at: string;
 }
 
 export interface Member {

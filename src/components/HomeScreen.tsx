@@ -4,13 +4,13 @@ import { useApp } from '@/context/AppContext';
 import { parseExpense, formatAmount } from '@/lib/parser';
 import { supabase } from '@/lib/supabase';
 import { getDailyRate } from '@/lib/blueRate';
-import { Expense, Category } from '@/types';
+import { Expense, Category, ShoppingItem, Member } from '@/types';
 import ExpenseDetailModal from '@/components/ExpenseDetailModal';
 
 const CAT_COLORS = ['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#E24B4A','#639922','#534AB7','#888780'];
 
 export default function HomeScreen() {
-  const { workspace, currentMember, categories, reloadCategories } = useApp();
+  const { workspace, currentMember, members, categories, reloadCategories } = useApp();
   const [input, setInput] = useState('');
   const [recents, setRecents] = useState<Expense[]>([]);
   const [saving, setSaving] = useState(false);
@@ -118,6 +118,14 @@ export default function HomeScreen() {
         </button>
       </form>
 
+      {workspace?.show_shopping_list && currentMember && (
+        <ShoppingListSection
+          workspaceId={workspace.id}
+          currentMember={currentMember}
+          members={members}
+        />
+      )}
+
       <button className="section-toggle" onClick={() => setShowRecents(v => !v)}>
         <span className="section-label">Recientes</span>
         <svg className={`chevron ${showRecents ? 'chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -202,6 +210,159 @@ export default function HomeScreen() {
         .empty { color: var(--text-tertiary); font-size: 14px; text-align: center; padding: 32px 0; margin: 0; }
       `}</style>
     </div>
+  );
+}
+
+function ShoppingListSection({ workspaceId, currentMember, members }: {
+  workspaceId: string;
+  currentMember: Member;
+  members: Member[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<ShoppingItem[]>([]);
+  const [newItem, setNewItem] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const loadItems = useCallback(async () => {
+    const { data } = await supabase
+      .from('shopping_items')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false });
+    setItems(data ?? []);
+  }, [workspaceId]);
+
+  useEffect(() => { loadItems(); }, [loadItems]);
+
+  async function addItem() {
+    const name = newItem.trim();
+    if (!name) return;
+    setSaving(true);
+    await supabase.from('shopping_items').insert({
+      workspace_id: workspaceId,
+      created_by: currentMember.id,
+      name,
+    });
+    setNewItem('');
+    setSaving(false);
+    loadItems();
+  }
+
+  async function toggleItem(item: ShoppingItem) {
+    if (!item.completed_at) {
+      await supabase.from('shopping_items').update({
+        completed_at: new Date().toISOString(),
+        completed_by: currentMember.id,
+      }).eq('id', item.id);
+    } else {
+      await supabase.from('shopping_items').update({
+        completed_at: null,
+        completed_by: null,
+      }).eq('id', item.id);
+    }
+    loadItems();
+  }
+
+  async function deleteItem(id: string) {
+    await supabase.from('shopping_items').delete().eq('id', id);
+    loadItems();
+  }
+
+  async function clearCompleted() {
+    await supabase.from('shopping_items')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .not('completed_at', 'is', null);
+    loadItems();
+  }
+
+  function memberName(id: string | null) {
+    if (!id) return '?';
+    return members.find(m => m.id === id)?.display_name ?? '?';
+  }
+
+  const pending = items.filter(i => !i.completed_at);
+  const completed = items.filter(i => i.completed_at);
+
+  return (
+    <>
+      <button className="section-toggle" onClick={() => setOpen(v => !v)}>
+        <span className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          🛒 Lista de compras
+          {pending.length > 0 && <span className="shop-badge">{pending.length}</span>}
+        </span>
+        <svg className={`chevron ${open ? 'chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="shop-panel">
+          <div className="shop-add">
+            <input
+              className="shop-input"
+              placeholder="Agregar ítem..."
+              value={newItem}
+              onChange={e => setNewItem(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
+            />
+            <button className="shop-add-btn" onClick={addItem} disabled={saving || !newItem.trim()}>→</button>
+          </div>
+
+          {items.length === 0 && <p className="shop-empty">La lista está vacía</p>}
+
+          {pending.map(item => (
+            <div key={item.id} className="shop-item">
+              <button className="check-btn" onClick={() => toggleItem(item)}>○</button>
+              <div className="shop-info">
+                <span className="shop-name">{item.name}</span>
+                <span className="shop-meta">cargó: {memberName(item.created_by)}</span>
+              </div>
+              <button className="shop-del" onClick={() => deleteItem(item.id)}>✕</button>
+            </div>
+          ))}
+
+          {completed.length > 0 && (
+            <>
+              <div className="shop-divider" />
+              {completed.map(item => (
+                <div key={item.id} className="shop-item shop-item--done">
+                  <button className="check-btn check-btn--done" onClick={() => toggleItem(item)}>✓</button>
+                  <div className="shop-info">
+                    <span className="shop-name">{item.name}</span>
+                    <span className="shop-meta">completó: {memberName(item.completed_by)}</span>
+                  </div>
+                  <button className="shop-del" onClick={() => deleteItem(item.id)}>✕</button>
+                </div>
+              ))}
+              <button className="shop-clear" onClick={clearCompleted}>Limpiar completados</button>
+            </>
+          )}
+        </div>
+      )}
+
+      <style jsx>{`
+        .shop-badge { background: var(--primary); color: white; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; line-height: 1.6; }
+        .shop-panel { background: var(--surface); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }
+        .shop-add { display: flex; gap: 8px; margin-bottom: 8px; }
+        .shop-input { flex: 1; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 16px; color: var(--text); background: var(--surface); font-family: inherit; }
+        .shop-input:focus { border-color: var(--primary); outline: none; }
+        .shop-add-btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 14px; font-size: 18px; font-weight: 700; cursor: pointer; }
+        .shop-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .shop-empty { font-size: 13px; color: var(--text-tertiary); text-align: center; padding: 16px 0 8px; margin: 0; }
+        .shop-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+        .shop-item--done { opacity: 0.5; }
+        .check-btn { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); background: none; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-tertiary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .check-btn--done { border-color: var(--primary); background: var(--primary); color: white; }
+        .shop-info { flex: 1; overflow: hidden; }
+        .shop-name { display: block; font-size: 14px; font-weight: 500; color: var(--text); }
+        .shop-item--done .shop-name { text-decoration: line-through; }
+        .shop-meta { display: block; font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+        .shop-del { border: none; background: none; color: var(--text-tertiary); font-size: 14px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+        .shop-divider { height: 1px; background: var(--border); margin: 4px 0; }
+        .shop-clear { background: none; border: none; color: var(--text-tertiary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 8px 0 2px; text-align: left; }
+      `}</style>
+    </>
   );
 }
 

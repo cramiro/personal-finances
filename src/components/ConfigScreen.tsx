@@ -44,7 +44,7 @@ function timeAgoEs(d: string | null): string {
 }
 
 function GeneralTab() {
-  const { workspace, members, currentMember, logout } = useApp();
+  const { workspace, members, currentMember, logout, setShoppingListEnabled } = useApp();
   const [copied, setCopied] = useState(false);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [inviteLoading, setInviteLoading] = useState(true);
@@ -101,6 +101,20 @@ function GeneralTab() {
         <h3 className="card-title">Workspace</h3>
         <Row label="Nombre" value={workspace?.name??''} />
         <Row label="Moneda default" value={workspace?.default_currency??'ARS'} />
+        {isOwner && (
+          <div className="feature-row">
+            <div className="feature-info">
+              <span className="feature-label">Lista de compras</span>
+              <span className="feature-desc">Agregar y compartir ítems pendientes</span>
+            </div>
+            <button
+              className={`toggle ${workspace?.show_shopping_list ? 'toggle--on' : ''}`}
+              onClick={() => setShoppingListEnabled(!workspace?.show_shopping_list)}
+            >
+              <span className="toggle-knob" />
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="card">
@@ -176,6 +190,14 @@ function GeneralTab() {
         .invite-token { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--text); word-break: break-all; font-family: monospace; }
         .invite-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
         .invite-expiry { font-size: 12px; color: var(--text-tertiary); }
+        .feature-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 4px; border-top: 1px solid var(--border); margin-top: 6px; }
+        .feature-info { flex: 1; }
+        .feature-label { display: block; font-size: 14px; font-weight: 600; color: var(--text); }
+        .feature-desc { display: block; font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+        .toggle { width: 44px; height: 26px; border-radius: 13px; border: none; background: var(--border); position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; padding: 0; }
+        .toggle--on { background: var(--primary); }
+        .toggle-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; transition: transform 0.2s; display: block; }
+        .toggle--on .toggle-knob { transform: translateX(18px); }
       `}</style>
     </div>
   );
