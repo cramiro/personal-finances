@@ -141,24 +141,6 @@ export default function HomeScreen() {
         </button>
       </form>
 
-      {workspace?.show_recurring && currentMember && (
-        <RecurringSection
-          workspaceId={workspace.id}
-          currentMember={currentMember}
-          members={members}
-          categories={categories}
-          refreshKey={recents.length}
-        />
-      )}
-
-      {workspace?.show_shopping_list && currentMember && (
-        <ShoppingListSection
-          workspaceId={workspace.id}
-          currentMember={currentMember}
-          members={members}
-        />
-      )}
-
       <button className="section-toggle" onClick={() => setShowRecents(v => !v)}>
         <span className="section-label">Recientes</span>
         <svg className={`chevron ${showRecents ? 'chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -195,6 +177,24 @@ export default function HomeScreen() {
           onSelect={id => { setOverrideCategoryId(id); setShowCatPicker(false); }}
           onCreated={async id => { await reloadCategories(); setOverrideCategoryId(id); setShowCatPicker(false); }}
           onClose={() => setShowCatPicker(false)}
+        />
+      )}
+
+      {workspace?.show_recurring && currentMember && (
+        <RecurringSection
+          workspaceId={workspace.id}
+          currentMember={currentMember}
+          members={members}
+          categories={categories}
+          refreshKey={recents.length}
+        />
+      )}
+
+      {workspace?.show_shopping_list && currentMember && (
+        <ShoppingListSection
+          workspaceId={workspace.id}
+          currentMember={currentMember}
+          members={members}
         />
       )}
 
