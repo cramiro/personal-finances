@@ -325,7 +325,10 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
       <button className="rec-toggle" onClick={() => setOpen(v => !v)}>
         <span className="rec-toggle-label">
           Gastos fijos — {monthLabel}
-          {pending.length > 0 && <span className="rec-badge">{pending.length}</span>}
+          {completed.length === templates.length
+            ? <span className="rec-badge rec-badge--done">✓</span>
+            : <span className="rec-badge">{completed.length}/{templates.length}</span>
+          }
         </span>
         <svg className={`rec-chevron ${open ? 'rec-chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -369,6 +372,7 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
         .rec-toggle { display: flex; align-items: center; justify-content: space-between; background: none; border: none; padding: 4px 0; cursor: pointer; width: 100%; }
         .rec-toggle-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
         .rec-badge { background: var(--primary); color: white; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; line-height: 1.6; }
+        .rec-badge--done { background: #1D9E75; }
         .rec-chevron { color: var(--text-tertiary); transition: transform 0.2s; flex-shrink: 0; }
         .rec-chevron--up { transform: rotate(180deg); }
         .rec-panel { background: var(--surface); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
