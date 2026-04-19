@@ -63,6 +63,23 @@ export default function HomeScreen() {
   useEffect(() => { loadRecents(); }, [loadRecents]);
 
 
+  async function addExpenseAsRecurring(expense: Expense) {
+    if (!workspace) return;
+    const { data: existing } = await supabase
+      .from('recurring_templates')
+      .select('id, name')
+      .eq('workspace_id', workspace.id);
+    const name = expense.description.trim();
+    if ((existing ?? []).some(t => t.name.toLowerCase() === name.toLowerCase())) return;
+    const maxOrder = (existing ?? []).length;
+    await supabase.from('recurring_templates').insert({
+      workspace_id: workspace.id,
+      name,
+      category_id: expense.category_id || null,
+      sort_order: maxOrder + 1,
+    });
+  }
+
   async function handleConfirm(e: React.FormEvent) {
     e.preventDefault();
     if (!workspace || !currentMember || parsed.amount <= 0) return;
@@ -191,6 +208,7 @@ export default function HomeScreen() {
           onClose={() => setSelected(null)}
           onSaved={() => { setSelected(null); loadRecents(); }}
           onDeleted={() => { setSelected(null); loadRecents(); }}
+          onAddAsRecurring={workspace?.show_recurring ? addExpenseAsRecurring : undefined}
         />
       )}
 

@@ -5,7 +5,7 @@ import { getDailyRate } from '@/lib/blueRate';
 import { formatAmount } from '@/lib/parser';
 import { Expense, Currency, Category } from '@/types';
 
-export default function ExpenseDetailModal({ expense, categories, isOwner, displayCur, toDisplay, onClose, onSaved, onDeleted }: {
+export default function ExpenseDetailModal({ expense, categories, isOwner, displayCur, toDisplay, onClose, onSaved, onDeleted, onAddAsRecurring }: {
   expense: Expense;
   categories: Category[];
   isOwner: boolean;
@@ -14,8 +14,10 @@ export default function ExpenseDetailModal({ expense, categories, isOwner, displ
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
+  onAddAsRecurring?: (expense: Expense) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [addedAsRecurring, setAddedAsRecurring] = useState(false);
   const [amount, setAmount] = useState(String(expense.amount));
   const [description, setDescription] = useState(expense.description);
   const [categoryId, setCategoryId] = useState(expense.category_id);
@@ -73,6 +75,18 @@ export default function ExpenseDetailModal({ expense, categories, isOwner, displ
                 <button className="btn-ghost" onClick={() => setEditing(true)}>Editar</button>
               </div>
             )}
+            {onAddAsRecurring && (
+              <button
+                className={`btn-recurring ${addedAsRecurring ? 'btn-recurring--done' : ''}`}
+                onClick={async () => {
+                  await onAddAsRecurring(expense);
+                  setAddedAsRecurring(true);
+                }}
+                disabled={addedAsRecurring}
+              >
+                {addedAsRecurring ? '✓ Agregado a gastos fijos' : '📋 Agregar a gastos fijos'}
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -121,6 +135,8 @@ export default function ExpenseDetailModal({ expense, categories, isOwner, displ
         .currency-toggle { display: flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
         .cur-btn { border: none; padding: 10px 12px; font-size: 13px; font-weight: 700; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
         .cur-btn.active { background: var(--primary); color: white; }
+        .btn-recurring { width: 100%; border: 1.5px solid var(--primary); border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 600; color: var(--primary); background: none; cursor: pointer; }
+        .btn-recurring--done { background: var(--primary-light); cursor: default; }
       `}</style>
     </div>
   );
