@@ -6,8 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { getDailyRate } from '@/lib/blueRate';
 import { Expense, Category, ShoppingItem, Member, RecurringTemplate, RecurringCheck } from '@/types';
 import ExpenseDetailModal from '@/components/ExpenseDetailModal';
-
-const CAT_COLORS = ['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#E24B4A','#639922','#534AB7','#888780'];
+import { CAT_COLORS } from '@/lib/constants';
 
 function timeAgo(d: string) {
   const diff = (Date.now() - new Date(d).getTime()) / 1000;
@@ -270,7 +269,7 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
   const loadAll = useCallback(async () => {
     const [{ data: tmpl }, { data: exps }, { data: chks }] = await Promise.all([
       supabase.from('recurring_templates').select('*').eq('workspace_id', workspaceId).order('sort_order'),
-      supabase.from('expenses').select('*')
+      supabase.from('expenses').select('id, description, category_id, member_id, date')
         .eq('workspace_id', workspaceId)
         .gte('date', currentMonth + '-01')
         .lt('date', nextMonthStart()),
@@ -279,11 +278,16 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
         .eq('year_month', currentMonth),
     ]);
     setTemplates(tmpl ?? []);
-    setMonthExpenses(exps ?? []);
+    setMonthExpenses((exps ?? []) as Expense[]);
     setChecks(chks ?? []);
   }, [workspaceId, currentMonth]);
 
-  useEffect(() => { loadAll(); }, [loadAll, refreshKey]);
+  // Initial load (and reload if workspace changes)
+  useEffect(() => { loadAll(); }, [loadAll]);
+  // On new expense: only reload if the panel is open — avoids 3 queries per expense when closed
+  // When panel opens: also reload to show fresh data
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) loadAll(); }, [open, refreshKey]);
 
   function getStatus(t: RecurringTemplate): { paid: boolean; byMember: string | null } {
     const check = checks.find(c => c.template_id === t.id);
@@ -434,10 +438,10 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     const patch = item.completed_at
       ? { completed_at: null, completed_by: null }
       : { completed_at: now, completed_by: currentMember.id };
-    // Optimistic update — UI responds instantly
+    // Optimistic update — UI responds instantly, no need to refetch
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...patch } : i));
     // Persist in background
-    supabase.from('shopping_items').update(patch).eq('id', item.id).then(() => loadItems());
+    supabase.from('shopping_items').update(patch).eq('id', item.id);
   }
 
   async function deleteItem(id: string) {

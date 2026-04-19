@@ -5,10 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { Category, Invite, RecurringTemplate } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
 import { parseExpense } from '@/lib/parser';
+import { CAT_COLORS } from '@/lib/constants';
 
 type Tab = 'general' | 'categories';
-
-const COLORS = ['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#E24B4A','#639922','#534AB7','#888780'];
 
 export default function ConfigScreen() {
   const [tab, setTab] = useState<Tab>('general');
@@ -79,7 +78,7 @@ function GeneralTab() {
     if (!workspace || !isOwner) { setInviteLoading(false); return; }
     supabase
       .from('invites')
-      .select('*')
+      .select('id, token, expires_at, used_at, workspace_id, created_by, created_at, used_by')
       .eq('workspace_id', workspace.id)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
@@ -320,25 +319,18 @@ function RecurringTemplatesSection() {
     const name = newName.trim();
     if (!name || !workspace) return;
     const maxOrder = Math.max(0, ...templates.map(t => t.sort_order));
-    await supabase.from('recurring_templates').insert({
-      workspace_id: workspace.id,
-      name,
-      category_id: newCategoryId || null,
-      sort_order: maxOrder + 1,
-    });
+    const { data: newTemplate } = await supabase.from('recurring_templates')
+      .insert({ workspace_id: workspace.id, name, category_id: newCategoryId || null, sort_order: maxOrder + 1 })
+      .select()
+      .single();
     setNewName('');
     setNewCategoryId('');
-    const { data } = await supabase.from('recurring_templates').select('*')
-      .eq('workspace_id', workspace.id).order('sort_order');
-    setTemplates(data ?? []);
+    if (newTemplate) setTemplates(prev => [...prev, newTemplate]);
   }
 
   async function deleteTemplate(id: string) {
-    if (!workspace) return;
     await supabase.from('recurring_templates').delete().eq('id', id);
-    const { data } = await supabase.from('recurring_templates').select('*')
-      .eq('workspace_id', workspace.id).order('sort_order');
-    setTemplates(data ?? []);
+    setTemplates(prev => prev.filter(t => t.id !== id));
   }
 
   function getCatColor(catId: string | null) {
@@ -509,7 +501,7 @@ function CategoriesTab() {
 
                 <label className="field-label">Color</label>
                 <div className="color-grid">
-                  {COLORS.map(c=>(
+                  {CAT_COLORS.map(c=>(
                     <button key={c} className={`color-dot ${color===c?'color-dot--active':''}`} style={{background:c}} onClick={()=>setColor(c)} />
                   ))}
                 </div>
