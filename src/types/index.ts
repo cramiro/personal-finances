@@ -7,6 +7,25 @@ export interface Workspace {
   default_currency: Currency;
   created_at: string;
   show_shopping_list: boolean;
+  show_recurring: boolean;
+}
+
+export interface RecurringTemplate {
+  id: string;
+  workspace_id: string;
+  name: string;
+  category_id: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface RecurringCheck {
+  id: string;
+  workspace_id: string;
+  template_id: string;
+  year_month: string;
+  checked_by: string;
+  checked_at: string;
 }
 
 export interface ShoppingItem {

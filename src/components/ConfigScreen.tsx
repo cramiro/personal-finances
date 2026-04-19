@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
-import { Category, Invite } from '@/types';
+import { Category, Invite, RecurringTemplate } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
 import { parseExpense } from '@/lib/parser';
 
@@ -44,7 +44,7 @@ function timeAgoEs(d: string | null): string {
 }
 
 function GeneralTab() {
-  const { workspace, members, currentMember, logout, setShoppingListEnabled } = useApp();
+  const { workspace, members, currentMember, logout, setShoppingListEnabled, setRecurringEnabled } = useApp();
   const [copied, setCopied] = useState(false);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [inviteLoading, setInviteLoading] = useState(true);
@@ -115,6 +115,21 @@ function GeneralTab() {
             </button>
           </div>
         )}
+        {isOwner && (
+          <div className="feature-row">
+            <div className="feature-info">
+              <span className="feature-label">Gastos fijos</span>
+              <span className="feature-desc">Checklist mensual de gastos recurrentes</span>
+            </div>
+            <button
+              className={`toggle ${workspace?.show_recurring ? 'toggle--on' : ''}`}
+              onClick={() => setRecurringEnabled(!workspace?.show_recurring)}
+            >
+              <span className="toggle-knob" />
+            </button>
+          </div>
+        )}
+        {isOwner && workspace?.show_recurring && <RecurringTemplatesSection />}
       </section>
 
       <section className="card">
@@ -208,6 +223,88 @@ function Row({ label, value }: { label:string; value:string }) {
     <div style={{display:'flex',justifyContent:'space-between',padding:'9px 0',borderTop:'1px solid var(--border)'}}>
       <span style={{fontSize:14,color:'var(--text)'}}>{label}</span>
       <span style={{fontSize:14,color:'var(--text-secondary)'}}>{value}</span>
+    </div>
+  );
+}
+
+function RecurringTemplatesSection() {
+  const { workspace, categories } = useApp();
+  const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
+  const [newName, setNewName] = useState('');
+  const [newCategoryId, setNewCategoryId] = useState('');
+
+  useEffect(() => {
+    if (!workspace) return;
+    supabase.from('recurring_templates').select('*')
+      .eq('workspace_id', workspace.id).order('sort_order')
+      .then(({ data }) => setTemplates(data ?? []));
+  }, [workspace]);
+
+  async function addTemplate() {
+    const name = newName.trim();
+    if (!name || !workspace) return;
+    const maxOrder = Math.max(0, ...templates.map(t => t.sort_order));
+    await supabase.from('recurring_templates').insert({
+      workspace_id: workspace.id,
+      name,
+      category_id: newCategoryId || null,
+      sort_order: maxOrder + 1,
+    });
+    setNewName('');
+    setNewCategoryId('');
+    const { data } = await supabase.from('recurring_templates').select('*')
+      .eq('workspace_id', workspace.id).order('sort_order');
+    setTemplates(data ?? []);
+  }
+
+  async function deleteTemplate(id: string) {
+    if (!workspace) return;
+    await supabase.from('recurring_templates').delete().eq('id', id);
+    const { data } = await supabase.from('recurring_templates').select('*')
+      .eq('workspace_id', workspace.id).order('sort_order');
+    setTemplates(data ?? []);
+  }
+
+  function getCatColor(catId: string | null) {
+    if (!catId) return 'var(--border)';
+    return categories.find(c => c.id === catId)?.color ?? 'var(--border)';
+  }
+
+  return (
+    <div className="rt-section">
+      {templates.map(t => (
+        <div key={t.id} className="rt-item">
+          <span className="rt-cat-dot" style={{ background: getCatColor(t.category_id) }} />
+          <span className="rt-name">{t.name}</span>
+          <button type="button" className="rt-del" onClick={() => deleteTemplate(t.id)}>✕</button>
+        </div>
+      ))}
+      <div className="rt-add-row">
+        <input
+          className="rt-input"
+          placeholder="Nombre (ej. Alquiler)"
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTemplate(); } }}
+        />
+        <select className="rt-select" value={newCategoryId} onChange={e => setNewCategoryId(e.target.value)}>
+          <option value="">Sin cat.</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+        </select>
+        <button type="button" className="rt-add-btn" onClick={addTemplate} disabled={!newName.trim()}>+</button>
+      </div>
+      <style jsx>{`
+        .rt-section { margin-top: 4px; }
+        .rt-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+        .rt-cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .rt-name { flex: 1; font-size: 14px; color: var(--text); }
+        .rt-del { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 14px; padding: 4px; }
+        .rt-add-row { display: flex; gap: 8px; margin-top: 10px; }
+        .rt-input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--surface); color: var(--text); font-family: inherit; min-width: 0; }
+        .rt-select { padding: 8px 4px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; background: var(--surface); color: var(--text); max-width: 90px; }
+        .rt-add-btn { padding: 8px 14px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+        .rt-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+      `}</style>
     </div>
   );
 }

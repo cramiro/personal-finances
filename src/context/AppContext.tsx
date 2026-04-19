@@ -29,6 +29,7 @@ interface AppCtx extends AppState {
   reloadMembers: () => Promise<void>;
   refreshBlueRate: () => Promise<void>;
   setShoppingListEnabled: (enabled: boolean) => Promise<void>;
+  setRecurringEnabled: (enabled: boolean) => Promise<void>;
 }
 
 const AppContext = createContext<AppCtx | null>(null);
@@ -245,6 +246,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  async function setRecurringEnabled(enabled: boolean) {
+    if (!state.workspace) return;
+    await supabase.from('workspaces')
+      .update({ show_recurring: enabled })
+      .eq('id', state.workspace.id);
+    setState(s => s.workspace
+      ? { ...s, workspace: { ...s.workspace, show_recurring: enabled } }
+      : s
+    );
+  }
+
   async function refreshBlueRate() {
     const blue = await getBlueRate();
     setState(s => {
@@ -258,7 +270,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state,
       hasWorkspace: !!state.workspace,
       login, register, logout,
-      setupWorkspace, joinWorkspace, reloadCategories, reloadMembers, refreshBlueRate, setShoppingListEnabled,
+      setupWorkspace, joinWorkspace, reloadCategories, reloadMembers, refreshBlueRate, setShoppingListEnabled, setRecurringEnabled,
     }}>
       {children}
     </AppContext.Provider>
