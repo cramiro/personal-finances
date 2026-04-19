@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Workspace, Member, Category, BlueRate } from '@/types';
+import { Workspace, Member, Category, BlueRate, Currency } from '@/types';
 import { getBlueRate } from '@/lib/blueRate';
 import { DEFAULT_CATEGORIES } from '@/lib/defaultCategories';
 
@@ -30,6 +30,8 @@ interface AppCtx extends AppState {
   refreshBlueRate: () => Promise<void>;
   setShoppingListEnabled: (enabled: boolean) => Promise<void>;
   setRecurringEnabled: (enabled: boolean) => Promise<void>;
+  updateWorkspaceName: (name: string) => Promise<void>;
+  updateDefaultCurrency: (currency: Currency) => Promise<void>;
 }
 
 const AppContext = createContext<AppCtx | null>(null);
@@ -257,6 +259,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  async function updateWorkspaceName(name: string) {
+    if (!state.workspace) return;
+    await supabase.from('workspaces')
+      .update({ name })
+      .eq('id', state.workspace.id);
+    setState(s => s.workspace ? { ...s, workspace: { ...s.workspace, name } } : s);
+  }
+
+  async function updateDefaultCurrency(currency: Currency) {
+    if (!state.workspace) return;
+    await supabase.from('workspaces')
+      .update({ default_currency: currency })
+      .eq('id', state.workspace.id);
+    setState(s => s.workspace ? { ...s, workspace: { ...s.workspace, default_currency: currency } } : s);
+  }
+
   async function refreshBlueRate() {
     const blue = await getBlueRate();
     setState(s => {
@@ -270,7 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state,
       hasWorkspace: !!state.workspace,
       login, register, logout,
-      setupWorkspace, joinWorkspace, reloadCategories, reloadMembers, refreshBlueRate, setShoppingListEnabled, setRecurringEnabled,
+      setupWorkspace, joinWorkspace, reloadCategories, reloadMembers, refreshBlueRate, setShoppingListEnabled, setRecurringEnabled, updateWorkspaceName, updateDefaultCurrency,
     }}>
       {children}
     </AppContext.Provider>

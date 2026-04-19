@@ -11,11 +11,11 @@ type Tab = 'general' | 'categories';
 const COLORS = ['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#E24B4A','#639922','#534AB7','#888780'];
 
 export default function ConfigScreen() {
-  const [tab, setTab] = useState<Tab>('categories');
+  const [tab, setTab] = useState<Tab>('general');
   return (
     <div className="wrap">
       <div className="tabs">
-        {(['categories','general'] as Tab[]).map(t => (
+        {(['general','categories'] as Tab[]).map(t => (
           <button key={t} className={`tab ${tab===t?'tab--active':''}`} onClick={()=>setTab(t)}>
             {t==='general'?'General':'Categorías'}
           </button>
@@ -44,12 +44,36 @@ function timeAgoEs(d: string | null): string {
 }
 
 function GeneralTab() {
-  const { workspace, members, currentMember, logout, setShoppingListEnabled, setRecurringEnabled } = useApp();
+  const { workspace, members, currentMember, logout, setShoppingListEnabled, setRecurringEnabled, updateWorkspaceName, updateDefaultCurrency } = useApp();
   const [copied, setCopied] = useState(false);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [inviteLoading, setInviteLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const isOwner = currentMember?.role === 'owner';
+
+  // Inline editing state for workspace settings
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [editingCurrency, setEditingCurrency] = useState(false);
+  const [savingCurrency, setSavingCurrency] = useState(false);
+
+  async function saveName() {
+    const trimmed = nameValue.trim();
+    if (!trimmed || trimmed === workspace?.name) { setEditingName(false); return; }
+    setSavingName(true);
+    await updateWorkspaceName(trimmed);
+    setSavingName(false);
+    setEditingName(false);
+  }
+
+  async function saveCurrency(cur: 'ARS' | 'USD') {
+    if (cur === workspace?.default_currency) { setEditingCurrency(false); return; }
+    setSavingCurrency(true);
+    await updateDefaultCurrency(cur);
+    setSavingCurrency(false);
+    setEditingCurrency(false);
+  }
 
   useEffect(() => {
     if (!workspace || !isOwner) { setInviteLoading(false); return; }
@@ -99,8 +123,55 @@ function GeneralTab() {
     <div className="content">
       <section className="card">
         <h3 className="card-title">Workspace</h3>
-        <Row label="Nombre" value={workspace?.name??''} />
-        <Row label="Moneda default" value={workspace?.default_currency??'ARS'} />
+
+        {/* Nombre editable */}
+        {editingName ? (
+          <div className="edit-row">
+            <input
+              className="edit-input"
+              value={nameValue}
+              onChange={e => setNameValue(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
+              autoFocus
+            />
+            <button className="edit-save" onClick={saveName} disabled={savingName}>{savingName ? '...' : 'Guardar'}</button>
+            <button className="edit-cancel" onClick={() => setEditingName(false)}>✕</button>
+          </div>
+        ) : (
+          <div className="setting-row">
+            <span className="setting-label">Nombre</span>
+            <div className="setting-right">
+              <span className="setting-value">{workspace?.name ?? ''}</span>
+              {isOwner && <button className="edit-link" onClick={() => { setNameValue(workspace?.name ?? ''); setEditingName(true); }}>Editar</button>}
+            </div>
+          </div>
+        )}
+
+        {/* Moneda default editable */}
+        {editingCurrency ? (
+          <div className="edit-row">
+            <span className="setting-label">Moneda</span>
+            <div className="currency-toggle">
+              {(['ARS', 'USD'] as const).map(c => (
+                <button
+                  key={c}
+                  className={`cur-btn ${(workspace?.default_currency ?? 'ARS') === c ? 'cur-btn--active' : ''}`}
+                  onClick={() => saveCurrency(c)}
+                  disabled={savingCurrency}
+                >{c}</button>
+              ))}
+            </div>
+            <button className="edit-cancel" onClick={() => setEditingCurrency(false)}>✕</button>
+          </div>
+        ) : (
+          <div className="setting-row">
+            <span className="setting-label">Moneda default</span>
+            <div className="setting-right">
+              <span className="setting-value">{workspace?.default_currency ?? 'ARS'}</span>
+              {isOwner && <button className="edit-link" onClick={() => setEditingCurrency(true)}>Editar</button>}
+            </div>
+          </div>
+        )}
         {isOwner && (
           <div className="feature-row">
             <div className="feature-info">
@@ -205,6 +276,19 @@ function GeneralTab() {
         .invite-token { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--text); word-break: break-all; font-family: monospace; }
         .invite-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
         .invite-expiry { font-size: 12px; color: var(--text-tertiary); }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--border); }
+        .setting-label { font-size: 14px; color: var(--text); }
+        .setting-right { display: flex; align-items: center; gap: 10px; }
+        .setting-value { font-size: 14px; color: var(--text-secondary); }
+        .edit-link { background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
+        .edit-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+        .edit-input { flex: 1; border: 1.5px solid var(--primary); border-radius: 8px; padding: 8px 10px; font-size: 14px; color: var(--text); background: var(--surface); font-family: inherit; outline: none; min-width: 0; }
+        .edit-save { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+        .edit-save:disabled { opacity: 0.6; }
+        .edit-cancel { background: none; border: none; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+        .currency-toggle { display: flex; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .cur-btn { border: none; padding: 7px 14px; font-size: 13px; font-weight: 700; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
+        .cur-btn--active { background: var(--primary); color: white; }
         .feature-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 4px; border-top: 1px solid var(--border); margin-top: 6px; }
         .feature-info { flex: 1; }
         .feature-label { display: block; font-size: 14px; font-weight: 600; color: var(--text); }
@@ -218,14 +302,6 @@ function GeneralTab() {
   );
 }
 
-function Row({ label, value }: { label:string; value:string }) {
-  return (
-    <div style={{display:'flex',justifyContent:'space-between',padding:'9px 0',borderTop:'1px solid var(--border)'}}>
-      <span style={{fontSize:14,color:'var(--text)'}}>{label}</span>
-      <span style={{fontSize:14,color:'var(--text-secondary)'}}>{value}</span>
-    </div>
-  );
-}
 
 function RecurringTemplatesSection() {
   const { workspace, categories } = useApp();
