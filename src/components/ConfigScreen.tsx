@@ -272,13 +272,17 @@ function RecurringTemplatesSection() {
 
   return (
     <div className="rt-section">
-      {templates.map(t => (
-        <div key={t.id} className="rt-item">
-          <span className="rt-cat-dot" style={{ background: getCatColor(t.category_id) }} />
-          <span className="rt-name">{t.name}</span>
-          <button type="button" className="rt-del" onClick={() => deleteTemplate(t.id)}>✕</button>
+      {templates.length > 0 && (
+        <div className="rt-chips">
+          {templates.map(t => (
+            <div key={t.id} className="rt-chip">
+              <span className="rt-chip-dot" style={{ background: getCatColor(t.category_id) }} />
+              <span className="rt-chip-name">{t.name}</span>
+              <button type="button" className="rt-chip-del" onClick={() => deleteTemplate(t.id)}>✕</button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
       <div className="rt-add-row">
         <input
           className="rt-input"
@@ -294,12 +298,13 @@ function RecurringTemplatesSection() {
         <button type="button" className="rt-add-btn" onClick={addTemplate} disabled={!newName.trim()}>+</button>
       </div>
       <style jsx>{`
-        .rt-section { margin-top: 4px; }
-        .rt-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
-        .rt-cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-        .rt-name { flex: 1; font-size: 14px; color: var(--text); }
-        .rt-del { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 14px; padding: 4px; }
-        .rt-add-row { display: flex; gap: 8px; margin-top: 10px; }
+        .rt-section { margin-top: 8px; }
+        .rt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .rt-chip { display: flex; align-items: center; gap: 5px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 20px; padding: 5px 8px 5px 10px; }
+        .rt-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .rt-chip-name { font-size: 13px; color: var(--text); font-weight: 500; }
+        .rt-chip-del { border: none; background: none; color: var(--text-tertiary); font-size: 11px; cursor: pointer; padding: 0 0 0 2px; line-height: 1; }
+        .rt-add-row { display: flex; gap: 8px; }
         .rt-input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--surface); color: var(--text); font-family: inherit; min-width: 0; }
         .rt-select { padding: 8px 4px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; background: var(--surface); color: var(--text); max-width: 90px; }
         .rt-add-btn { padding: 8px 14px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
