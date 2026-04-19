@@ -49,12 +49,14 @@ export default function HomeScreen() {
 
   const loadRecents = useCallback(async () => {
     if (!workspace) return;
+    const monthStart = new Date().toISOString().slice(0, 7) + '-01';
     const { data } = await supabase
       .from('expenses')
       .select('*, categories(name,color,icon), members(display_name)')
       .eq('workspace_id', workspace.id)
+      .gte('date', monthStart)
       .order('date', { ascending: false })
-      .limit(15);
+      .limit(50);
     setRecents(data ?? []);
   }, [workspace]);
 
