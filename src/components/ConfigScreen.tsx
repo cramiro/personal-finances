@@ -258,7 +258,7 @@ function GeneralTab() {
         .card-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.4px; }
         .link-btn { background: none; border: none; color: var(--primary); font-weight: 700; font-size: 14px; }
         .add-row { margin-top: 10px; }
-        .input { width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; color: var(--text); }
+        .input { width: 100%; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 16px; color: var(--text); }
         .input:focus { border-color: var(--primary); }
         .btn-primary { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
         .btn-ghost { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 16px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; }
@@ -282,7 +282,7 @@ function GeneralTab() {
         .setting-value { font-size: 14px; color: var(--text-secondary); }
         .edit-link { background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
         .edit-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
-        .edit-input { flex: 1; border: 1.5px solid var(--primary); border-radius: 8px; padding: 8px 10px; font-size: 14px; color: var(--text); background: var(--surface); font-family: inherit; outline: none; min-width: 0; }
+        .edit-input { flex: 1; border: 1.5px solid var(--primary); border-radius: 8px; padding: 8px 10px; font-size: 16px; color: var(--text); background: var(--surface); font-family: inherit; outline: none; min-width: 0; }
         .edit-save { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
         .edit-save:disabled { opacity: 0.6; }
         .edit-cancel { background: none; border: none; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 4px; flex-shrink: 0; }
@@ -381,8 +381,8 @@ function RecurringTemplatesSection() {
         .rt-chip-name { font-size: 13px; color: var(--text); font-weight: 500; }
         .rt-chip-del { border: none; background: none; color: var(--text-tertiary); font-size: 11px; cursor: pointer; padding: 0 0 0 2px; line-height: 1; }
         .rt-add-row { display: flex; gap: 8px; }
-        .rt-input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--surface); color: var(--text); font-family: inherit; min-width: 0; }
-        .rt-select { padding: 8px 4px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; background: var(--surface); color: var(--text); max-width: 90px; }
+        .rt-input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--surface); color: var(--text); font-family: inherit; min-width: 0; }
+        .rt-select { padding: 8px 4px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; background: var(--surface); color: var(--text); max-width: 90px; }
         .rt-add-btn { padding: 8px 14px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
         .rt-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
       `}</style>
@@ -542,7 +542,7 @@ function CategoriesTab() {
         .reprocess-kws--empty { color:var(--text-tertiary);font-style:italic; }
         .reprocess-result { font-size:14px;font-weight:700;color:var(--primary);margin:0;text-align:center;padding:8px 0; }
         .field-label { font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:-6px; }
-        .field-input { border:1.5px solid var(--border);border-radius:8px;padding:11px 12px;font-size:14px;color:var(--text);width:100%;resize:none;font-family:inherit; }
+        .field-input { border:1.5px solid var(--border);border-radius:8px;padding:11px 12px;font-size:16px;color:var(--text);width:100%;resize:none;font-family:inherit; }
         .field-input:focus { border-color:var(--primary);outline:none; }
         .color-grid { display:flex;gap:10px;flex-wrap:wrap; }
         .color-dot { width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer; }
