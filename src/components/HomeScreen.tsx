@@ -419,14 +419,16 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     if (!name) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('shopping_items').insert({
+      const { data, error } = await supabase.from('shopping_items').insert({
         workspace_id: workspaceId,
         created_by: currentMember.id,
         name,
-      });
-      if (!error) {
+      }).select().single();
+      if (!error && data) {
         setNewItem('');
-        loadItems();
+        // Prepend to local state instead of refetching — avoids overwriting
+        // optimistic completed_at updates from toggleItem (fire-and-forget)
+        setItems(prev => [data, ...prev]);
       }
     } finally {
       setSaving(false);
