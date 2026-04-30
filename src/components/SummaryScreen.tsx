@@ -21,6 +21,35 @@ function getMonths() {
 const MONTHS = getMonths();
 const BAR_MARGIN = { top: 24, right: 4, bottom: 0, left: 4 };
 
+// --- Weekly helpers ---
+function getMondayKey(dateStr: string): string {
+  const d = new Date(dateStr.slice(0, 10) + 'T12:00:00');
+  const day = d.getDay(); // 0=Sun, 1=Mon…
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return d.toISOString().slice(0, 10); // "YYYY-MM-DD" of Monday
+}
+
+function getWeeks8(): string[] {
+  const keys: string[] = [];
+  const today = new Date();
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i * 7);
+    const key = getMondayKey(d.toISOString());
+    if (!keys.includes(key)) keys.push(key);
+  }
+  return keys;
+}
+
+function getWeekLabel(mondayKey: string): string {
+  const thisMon = getMondayKey(new Date().toISOString());
+  const lastMon = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return getMondayKey(d.toISOString()); })();
+  if (mondayKey === thisMon) return 'Esta sem.';
+  if (mondayKey === lastMon) return 'Sem. ant.';
+  const d = new Date(mondayKey + 'T12:00:00');
+  return d.toLocaleString('es-AR', { day: 'numeric', month: 'short' }).replace('.', '');
+}
+
 function fmtShort(value: number, cur: Currency): string {
   if (cur === 'USD') {
     if (value >= 1000) return `U$${(value / 1000).toFixed(1).replace('.0', '')}K`;
@@ -42,26 +71,37 @@ export default function SummaryScreen() {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [drillCat, setDrillCat] = useState<{id: string; name: string; color: string} | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [granularity, setGranularity] = useState<'monthly' | 'weekly'>('monthly');
 
   const load = useCallback(async () => {
     if (!workspace) return;
     setLoading(true);
-    const start = (from < to ? from : to);
-    const end   = (from < to ? to : from);
-    const startDate = `${start}-01T00:00:00`;
-    const endD = new Date(`${end}-01`); endD.setMonth(endD.getMonth()+1);
+
+    let startDate: string, endDate: string;
+    if (granularity === 'weekly') {
+      const d = new Date(); d.setDate(d.getDate() - 7 * 7);
+      startDate = getMondayKey(d.toISOString()) + 'T00:00:00';
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      endDate = tomorrow.toISOString();
+    } else {
+      const start = (from < to ? from : to);
+      const end   = (from < to ? to : from);
+      startDate = `${start}-01T00:00:00`;
+      const endD = new Date(`${end}-01`); endD.setMonth(endD.getMonth()+1);
+      endDate = endD.toISOString();
+    }
 
     let q = supabase.from('expenses')
       .select('*, categories(name,color,icon), members(display_name,id)')
       .eq('workspace_id', workspace.id)
-      .gte('date', startDate).lte('date', endD.toISOString())
+      .gte('date', startDate).lte('date', endDate)
       .order('date', { ascending: false });
     if (memberId) q = q.eq('member_id', memberId);
 
     const { data } = await q;
     setExpenses(data ?? []);
     setLoading(false);
-  }, [workspace, from, to, memberId]);
+  }, [workspace, from, to, memberId, granularity]);
 
   useEffect(() => {
     load();
@@ -115,26 +155,44 @@ export default function SummaryScreen() {
     return out;
   }, [from, to]);
 
-  // Reset selectedMonth when range/member changes
-  useEffect(() => { setSelectedMonth(null); }, [from, to, memberId]);
+  // Reset selectedMonth when range/member/granularity changes
+  useEffect(() => { setSelectedMonth(null); }, [from, to, memberId, granularity]);
 
-  // Single-pass chart data — O(n) instead of O(n×months)
+  // Single-pass chart data — unified shape for both monthly and weekly
   const chartData = useMemo(() => {
-    const monthTotals: Record<string, number> = {};
-    expenses.forEach(e => {
-      const mo = e.date.slice(0, 7);
-      monthTotals[mo] = (monthTotals[mo] ?? 0) + (displayAmounts.get(e.id) ?? 0);
-    });
-    return range.map(mo => ({
-      monthKey: mo,
-      month: new Date(`${mo}-02T12:00:00Z`).toLocaleString('es-AR', { month: 'short' }).replace('.', ''),
-      total: Math.round(monthTotals[mo] ?? 0),
-    }));
-  }, [expenses, displayAmounts, range]);
+    if (granularity === 'monthly') {
+      const monthTotals: Record<string, number> = {};
+      expenses.forEach(e => {
+        const mo = e.date.slice(0, 7);
+        monthTotals[mo] = (monthTotals[mo] ?? 0) + (displayAmounts.get(e.id) ?? 0);
+      });
+      return range.map(mo => ({
+        periodKey: mo,
+        label: new Date(`${mo}-02T12:00:00Z`).toLocaleString('es-AR', { month: 'short' }).replace('.', ''),
+        total: Math.round(monthTotals[mo] ?? 0),
+      }));
+    } else {
+      const weeks8 = getWeeks8();
+      const weekTotals: Record<string, number> = {};
+      expenses.forEach(e => {
+        const wk = getMondayKey(e.date);
+        weekTotals[wk] = (weekTotals[wk] ?? 0) + (displayAmounts.get(e.id) ?? 0);
+      });
+      return weeks8.map(wk => ({
+        periodKey: wk,
+        label: getWeekLabel(wk),
+        total: Math.round(weekTotals[wk] ?? 0),
+      }));
+    }
+  }, [expenses, displayAmounts, range, granularity]);
 
   // Category breakdown — key included to avoid reverse-lookup in render
   const breakdown = useMemo(() => {
-    const src = selectedMonth ? expenses.filter(e => e.date.startsWith(selectedMonth)) : expenses;
+    const src = selectedMonth
+      ? expenses.filter(e => granularity === 'weekly'
+          ? getMondayKey(e.date) === selectedMonth
+          : e.date.startsWith(selectedMonth))
+      : expenses;
     const catMap: Record<string, { name: string; color: string; total: number; key: string }> = {};
     src.forEach(e => {
       const cat = e.categories as any;
@@ -143,19 +201,29 @@ export default function SummaryScreen() {
       catMap[key].total += displayAmounts.get(e.id) ?? 0;
     });
     return Object.values(catMap).sort((a, b) => b.total - a.total);
-  }, [expenses, selectedMonth, displayAmounts]);
+  }, [expenses, selectedMonth, displayAmounts, granularity]);
 
   const catPeriodLabel = selectedMonth
-    ? new Date(`${selectedMonth}-02T12:00:00Z`).toLocaleString('es-AR', { month: 'long', year: '2-digit' }).replace('.','')
+    ? (granularity === 'weekly'
+        ? getWeekLabel(selectedMonth)
+        : new Date(`${selectedMonth}-02T12:00:00Z`).toLocaleString('es-AR', { month: 'long', year: '2-digit' }).replace('.',''))
     : null;
 
   return (
     <div className="wrap">
-      {/* Month selectors */}
-      <div className="selectors">
-        <Select label="Desde" value={from} onChange={setFrom} />
-        <Select label="Hasta" value={to} onChange={setTo} />
+      {/* Granularity toggle */}
+      <div className="gran-toggle">
+        <button className={`gran-btn ${granularity === 'monthly' ? 'gran-btn--active' : ''}`} onClick={() => setGranularity('monthly')}>Mensual</button>
+        <button className={`gran-btn ${granularity === 'weekly' ? 'gran-btn--active' : ''}`} onClick={() => setGranularity('weekly')}>Semanal</button>
       </div>
+
+      {/* Month selectors — only in monthly mode */}
+      {granularity === 'monthly' && (
+        <div className="selectors">
+          <Select label="Desde" value={from} onChange={setFrom} />
+          <Select label="Hasta" value={to} onChange={setTo} />
+        </div>
+      )}
 
       {loading ? (
         <div className="loading"><div className="spinner" /></div>
@@ -185,17 +253,17 @@ export default function SummaryScreen() {
           {/* Bar chart */}
           {chartData.some(d=>d.total>0) && (
             <div className="chart-card">
-              <p className="section-label">Por mes</p>
+              <p className="section-label">{granularity === 'weekly' ? 'Por semana' : 'Por mes'}</p>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} margin={BAR_MARGIN} style={{cursor:'pointer'}}>
-                  <XAxis dataKey="month" tick={{fontSize:12,fill:'#6B6B6B'}} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{fontSize:12,fill:'#6B6B6B'}} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip
                     cursor={{fill:'#f0f0ee'}}
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
-                      const mk = (payload[0].payload as any).monthKey;
-                      const isActive = selectedMonth === mk;
+                      const pk = (payload[0].payload as any).periodKey;
+                      const isActive = selectedMonth === pk;
                       return (
                         <div className="tt-box">
                           <p className="tt-month">{label}</p>
@@ -206,8 +274,8 @@ export default function SummaryScreen() {
                     }}
                   />
                   <Bar dataKey="total" radius={[6,6,0,0]} onClick={(data: any) => {
-                    const mk = data.monthKey;
-                    setSelectedMonth((prev: string | null) => prev === mk ? null : mk);
+                    const pk = data.periodKey;
+                    setSelectedMonth((prev: string | null) => prev === pk ? null : pk);
                   }}>
                     <LabelList
                       dataKey="total"
@@ -216,7 +284,7 @@ export default function SummaryScreen() {
                       style={{ fontSize: 11, fontWeight: 700, fill: '#6B6B6B' }}
                     />
                     {chartData.map((d,i)=>(
-                      <Cell key={i} fill={selectedMonth && selectedMonth !== d.monthKey ? '#b2d8cc' : '#1D9E75'} />
+                      <Cell key={i} fill={selectedMonth && selectedMonth !== d.periodKey ? '#b2d8cc' : '#1D9E75'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -260,7 +328,11 @@ export default function SummaryScreen() {
               catId={drillCat.id}
               catName={drillCat.name}
               catColor={drillCat.color}
-              expenses={selectedMonth ? expenses.filter(e => e.date.startsWith(selectedMonth)) : expenses}
+              expenses={selectedMonth
+                ? expenses.filter(e => granularity === 'weekly'
+                    ? getMondayKey(e.date) === selectedMonth
+                    : e.date.startsWith(selectedMonth))
+                : expenses}
               toDisplay={toDisplay}
               displayCur={displayCur}
               isOwner={isOwner}
@@ -276,6 +348,9 @@ export default function SummaryScreen() {
 
       <style jsx>{`
         .wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .gran-toggle { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; }
+        .gran-btn { flex: 1; padding: 9px; border: none; background: none; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+        .gran-btn--active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
         .selectors { display: flex; gap: 12px; }
         .loading { display:flex;justify-content:center;padding:40px; }
         .spinner { width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.7s linear infinite; }
