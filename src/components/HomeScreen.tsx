@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { getDailyRate } from '@/lib/blueRate';
 import { Expense, Category, ShoppingItem, Member, RecurringTemplate, RecurringCheck } from '@/types';
 import ExpenseDetailModal from '@/components/ExpenseDetailModal';
-import { CAT_COLORS } from '@/lib/constants';
+import { CAT_COLORS, arDate, arYearMonth } from '@/lib/constants';
 
 function timeAgo(d: string) {
   const diff = (Date.now() - new Date(d).getTime()) / 1000;
@@ -48,7 +48,7 @@ export default function HomeScreen() {
 
   const loadRecents = useCallback(async () => {
     if (!workspace) return;
-    const monthStart = new Date().toISOString().slice(0, 7) + '-01';
+    const monthStart = arYearMonth() + '-01';
     const { data } = await supabase
       .from('expenses')
       .select('*, categories(name,color,icon), members(display_name)')
@@ -83,7 +83,7 @@ export default function HomeScreen() {
     e.preventDefault();
     if (!workspace || !currentMember || parsed.amount <= 0) return;
     setSaving(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = arDate();
     const rate = await getDailyRate(today);
     const amount_ars = parsed.currency === 'ARS' ? parsed.amount : parsed.amount * rate;
     const amount_usd = parsed.currency === 'USD' ? parsed.amount : parsed.amount / rate;
@@ -96,7 +96,7 @@ export default function HomeScreen() {
       amount_usd: Math.round(amount_usd * 100) / 100,
       description: parsed.description || input,
       category_id: activeCategoryId,
-      date: new Date().toISOString(),
+      date: arDate(),
     });
     setSaving(false);
     if (!error) {
@@ -247,10 +247,10 @@ export default function HomeScreen() {
 }
 
 function nextMonthStart() {
-  const d = new Date();
-  d.setDate(1);
-  d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10);
+  const [yr, mo] = arYearMonth().split('-').map(Number);
+  let ny = yr, nm = mo + 1;
+  if (nm > 12) { nm = 1; ny++; }
+  return `${ny}-${String(nm).padStart(2, '0')}-01`;
 }
 
 function RecurringSection({ workspaceId, currentMember, members, categories, refreshKey }: {
@@ -260,7 +260,7 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
   categories: Category[];
   refreshKey: number;
 }) {
-  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const currentMonth = useMemo(() => arYearMonth(), []);
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
   const [monthExpenses, setMonthExpenses] = useState<Expense[]>([]);
@@ -322,7 +322,7 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
 
   if (templates.length === 0) return null;
 
-  const monthLabel = new Date().toLocaleString('es-AR', { month: 'long' });
+  const monthLabel = new Date(arYearMonth() + '-02T12:00:00').toLocaleString('es-AR', { month: 'long' });
 
   return (
     <>

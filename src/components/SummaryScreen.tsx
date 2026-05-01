@@ -6,14 +6,16 @@ import { supabase } from '@/lib/supabase';
 import { formatAmount } from '@/lib/parser';
 import { Expense, Currency, Category } from '@/types';
 import ExpenseDetailModal from '@/components/ExpenseDetailModal';
+import { arDate, arYearMonth } from '@/lib/constants';
 
 function getMonths() {
   const out = [];
-  const now = new Date();
+  const [yr, mo] = arDate().split('-').map(Number);
   for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const label = d.toLocaleString('es-AR', { month: 'short', year: '2-digit' }).replace('.','');
+    let y = yr, m = mo - i;
+    if (m <= 0) { m += 12; y--; }
+    const value = `${y}-${String(m).padStart(2, '0')}`;
+    const label = new Date(`${value}-02T12:00:00`).toLocaleString('es-AR', { month: 'short', year: '2-digit' }).replace('.', '');
     out.push({ value, label });
   }
   return out;
@@ -31,19 +33,16 @@ function getMondayKey(dateStr: string): string {
 
 function getWeeks8(): string[] {
   const keys: string[] = [];
-  const today = new Date();
   for (let i = 7; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i * 7);
-    const key = getMondayKey(d.toISOString());
+    const key = getMondayKey(arDate(new Date(Date.now() - i * 7 * 86_400_000)));
     if (!keys.includes(key)) keys.push(key);
   }
   return keys;
 }
 
 function getWeekLabel(mondayKey: string): string {
-  const thisMon = getMondayKey(new Date().toISOString());
-  const lastMon = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return getMondayKey(d.toISOString()); })();
+  const thisMon = getMondayKey(arDate());
+  const lastMon = getMondayKey(arDate(new Date(Date.now() - 7 * 86_400_000)));
   if (mondayKey === thisMon) return 'Esta sem.';
   if (mondayKey === lastMon) return 'Sem. ant.';
   const d = new Date(mondayKey + 'T12:00:00');
@@ -90,11 +89,10 @@ export default function SummaryScreen() {
     setPreset(p);
     if (p === 'this-week') {
       setGranularity('weekly');
-      setSelectedMonth(getMondayKey(new Date().toISOString()));
+      setSelectedMonth(getMondayKey(arDate()));
     } else if (p === 'last-week') {
       setGranularity('weekly');
-      const d = new Date(); d.setDate(d.getDate() - 7);
-      setSelectedMonth(getMondayKey(d.toISOString()));
+      setSelectedMonth(getMondayKey(arDate(new Date(Date.now() - 7 * 86_400_000))));
     } else if (p === 'this-month') {
       setGranularity('monthly');
       setFrom(MONTHS[0].value); setTo(MONTHS[0].value);
@@ -107,7 +105,7 @@ export default function SummaryScreen() {
       setFrom(MONTHS[Math.min(2, MONTHS.length - 1)].value); setTo(MONTHS[0].value);
     } else if (p === 'ytd') {
       setGranularity('monthly');
-      setFrom(`${new Date().getFullYear()}-01`); setTo(MONTHS[0].value);
+      setFrom(`${arDate().slice(0, 4)}-01`); setTo(MONTHS[0].value);
     }
     // 'custom': keep current granularity/from/to; user adjusts manually
   }
@@ -118,10 +116,8 @@ export default function SummaryScreen() {
 
     let startDate: string, endDate: string;
     if (granularity === 'weekly') {
-      const d = new Date(); d.setDate(d.getDate() - 7 * 7);
-      startDate = getMondayKey(d.toISOString()) + 'T00:00:00';
-      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-      endDate = tomorrow.toISOString();
+      startDate = getMondayKey(arDate(new Date(Date.now() - 7 * 7 * 86_400_000)));
+      endDate = arDate(new Date(Date.now() + 86_400_000)); // tomorrow in AR time (exclusive upper bound)
     } else {
       const start = (from < to ? from : to);
       const end   = (from < to ? to : from);
