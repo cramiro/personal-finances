@@ -51,7 +51,7 @@ export default function HomeScreen() {
     const monthStart = arYearMonth() + '-01';
     const { data } = await supabase
       .from('expenses')
-      .select('*, categories(name,color,icon), members(display_name)')
+      .select('*, categories(name,color,icon)')
       .eq('workspace_id', workspace.id)
       .gte('date', monthStart)
       .order('date', { ascending: false })
@@ -150,13 +150,13 @@ export default function HomeScreen() {
         {recents.length === 0 && <p className="empty">Cargá tu primer gasto</p>}
         {recents.map(e => {
           const cat = e.categories as any;
-          const mem = e.members as any;
+          const memberName = members.find(m => m.id === e.member_id)?.display_name;
           return (
             <button key={e.id} className="expense-row" onClick={() => setSelected(e)}>
               <span className="cat-dot" style={{ background: cat?.color ?? '#888' }} />
               <div className="exp-info">
                 <span className="exp-desc">{e.description}</span>
-                <span className="exp-meta">{cat?.name} · {mem?.display_name}</span>
+                <span className="exp-meta">{cat?.name} · {memberName}</span>
               </div>
               <div className="exp-right">
                 <span className="exp-amount">{formatAmount(e.amount, e.currency)}</span>

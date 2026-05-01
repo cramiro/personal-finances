@@ -127,7 +127,7 @@ export default function SummaryScreen() {
     }
 
     let q = supabase.from('expenses')
-      .select('*, categories(name,color,icon), members(display_name,id)')
+      .select('*, categories(name,color,icon)')
       .eq('workspace_id', workspace.id)
       .gte('date', startDate).lt('date', endDate)
       .order('date', { ascending: false });
@@ -387,6 +387,7 @@ export default function SummaryScreen() {
               displayCur={displayCur}
               isOwner={isOwner}
               categories={categories}
+              members={members}
               onClose={() => setDrillCat(null)}
               onReload={load}
             />
@@ -446,7 +447,7 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
-function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur, isOwner, categories, onClose, onReload }: {
+function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur, isOwner, categories, members, onClose, onReload }: {
   catId: string;
   catName: string;
   catColor: string;
@@ -455,6 +456,7 @@ function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur,
   displayCur: Currency;
   isOwner: boolean;
   categories: Category[];
+  members: { id: string; display_name: string }[];
   onClose: () => void;
   onReload: () => void;
 }) {
@@ -478,12 +480,12 @@ function DrillModal({ catId, catName, catColor, expenses, toDisplay, displayCur,
         </div>
         <div className="modal-list">
           {items.map(e => {
-            const mem = e.members as any;
+            const memberName = members.find(m => m.id === e.member_id)?.display_name;
             return (
               <button key={e.id} className="item-row" onClick={() => setSelected(e)}>
                 <div className="item-info">
                   <span className="item-desc">{e.description}</span>
-                  <span className="item-meta">{mem?.display_name} · {fmtDate(e.date)}</span>
+                  <span className="item-meta">{memberName} · {fmtDate(e.date)}</span>
                 </div>
                 <span className="item-amount">{formatAmount(toDisplay(e), displayCur)}</span>
                 {isOwner && <span className="item-chevron">›</span>}
