@@ -50,6 +50,18 @@ function getWeekLabel(mondayKey: string): string {
   return d.toLocaleString('es-AR', { day: 'numeric', month: 'short' }).replace('.', '');
 }
 
+// --- Preset chips ---
+type Preset = 'this-week' | 'last-week' | 'this-month' | 'last-month' | '3-months' | 'ytd' | 'custom';
+const PRESET_LABELS: Record<Preset, string> = {
+  'this-week':  'Esta sem.',
+  'last-week':  'Sem. ant.',
+  'this-month': 'Este mes',
+  'last-month': 'Mes ant.',
+  '3-months':   '3 meses',
+  'ytd':        'Este año',
+  'custom':     '···',
+};
+
 function fmtShort(value: number, cur: Currency): string {
   if (cur === 'USD') {
     if (value >= 1000) return `U$${(value / 1000).toFixed(1).replace('.0', '')}K`;
@@ -63,7 +75,8 @@ function fmtShort(value: number, cur: Currency): string {
 export default function SummaryScreen() {
   const { workspace, members, categories, currentMember, blueRate, refreshBlueRate } = useApp();
   const isOwner = currentMember?.role === 'owner';
-  const [from, setFrom] = useState(MONTHS[2]?.value ?? MONTHS[0].value);
+  const [preset, setPreset] = useState<Preset>('this-month');
+  const [from, setFrom] = useState(MONTHS[0].value);
   const [to, setTo] = useState(MONTHS[0].value);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
@@ -72,6 +85,32 @@ export default function SummaryScreen() {
   const [drillCat, setDrillCat] = useState<{id: string; name: string; color: string} | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<'monthly' | 'weekly'>('monthly');
+
+  function applyPreset(p: Preset) {
+    setPreset(p);
+    if (p === 'this-week') {
+      setGranularity('weekly');
+      setSelectedMonth(getMondayKey(new Date().toISOString()));
+    } else if (p === 'last-week') {
+      setGranularity('weekly');
+      const d = new Date(); d.setDate(d.getDate() - 7);
+      setSelectedMonth(getMondayKey(d.toISOString()));
+    } else if (p === 'this-month') {
+      setGranularity('monthly');
+      setFrom(MONTHS[0].value); setTo(MONTHS[0].value);
+    } else if (p === 'last-month') {
+      setGranularity('monthly');
+      const m1 = MONTHS[1] ?? MONTHS[0];
+      setFrom(m1.value); setTo(m1.value);
+    } else if (p === '3-months') {
+      setGranularity('monthly');
+      setFrom(MONTHS[Math.min(2, MONTHS.length - 1)].value); setTo(MONTHS[0].value);
+    } else if (p === 'ytd') {
+      setGranularity('monthly');
+      setFrom(`${new Date().getFullYear()}-01`); setTo(MONTHS[0].value);
+    }
+    // 'custom': keep current granularity/from/to; user adjusts manually
+  }
 
   const load = useCallback(async () => {
     if (!workspace) return;
@@ -155,8 +194,8 @@ export default function SummaryScreen() {
     return out;
   }, [from, to]);
 
-  // Reset selectedMonth when range/member/granularity changes
-  useEffect(() => { setSelectedMonth(null); }, [from, to, memberId, granularity]);
+  // Reset selectedMonth when range or member changes (not granularity — applyPreset handles that explicitly)
+  useEffect(() => { setSelectedMonth(null); }, [from, to, memberId]);
 
   // Single-pass chart data — unified shape for both monthly and weekly
   const chartData = useMemo(() => {
@@ -211,18 +250,33 @@ export default function SummaryScreen() {
 
   return (
     <div className="wrap">
-      {/* Granularity toggle */}
-      <div className="gran-toggle">
-        <button className={`gran-btn ${granularity === 'monthly' ? 'gran-btn--active' : ''}`} onClick={() => setGranularity('monthly')}>Mensual</button>
-        <button className={`gran-btn ${granularity === 'weekly' ? 'gran-btn--active' : ''}`} onClick={() => setGranularity('weekly')}>Semanal</button>
+      {/* Preset chips */}
+      <div className="preset-row">
+        {(Object.keys(PRESET_LABELS) as Preset[]).map(p => (
+          <button
+            key={p}
+            className={`preset-chip ${preset === p ? 'preset-chip--active' : ''}`}
+            onClick={() => applyPreset(p)}
+          >
+            {PRESET_LABELS[p]}
+          </button>
+        ))}
       </div>
 
-      {/* Month selectors — only in monthly mode */}
-      {granularity === 'monthly' && (
-        <div className="selectors">
-          <Select label="Desde" value={from} onChange={setFrom} />
-          <Select label="Hasta" value={to} onChange={setTo} />
-        </div>
+      {/* Custom: granularity toggle + manual selectors */}
+      {preset === 'custom' && (
+        <>
+          <div className="gran-toggle">
+            <button className={`gran-btn ${granularity === 'monthly' ? 'gran-btn--active' : ''}`} onClick={() => setGranularity('monthly')}>Mensual</button>
+            <button className={`gran-btn ${granularity === 'weekly' ? 'gran-btn--active' : ''}`} onClick={() => setGranularity('weekly')}>Semanal</button>
+          </div>
+          {granularity === 'monthly' && (
+            <div className="selectors">
+              <Select label="Desde" value={from} onChange={setFrom} />
+              <Select label="Hasta" value={to} onChange={setTo} />
+            </div>
+          )}
+        </>
       )}
 
       {loading ? (
@@ -348,6 +402,10 @@ export default function SummaryScreen() {
 
       <style jsx>{`
         .wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .preset-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+        .preset-row::-webkit-scrollbar { display: none; }
+        .preset-chip { flex-shrink: 0; padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 20px; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--text-secondary); cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+        .preset-chip--active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
         .gran-toggle { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; }
         .gran-btn { flex: 1; padding: 9px; border: none; background: none; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
         .gran-btn--active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
