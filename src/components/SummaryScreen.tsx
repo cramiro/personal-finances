@@ -133,7 +133,7 @@ export default function SummaryScreen() {
     let q = supabase.from('expenses')
       .select('*, categories(name,color,icon), members(display_name,id)')
       .eq('workspace_id', workspace.id)
-      .gte('date', startDate).lte('date', endDate)
+      .gte('date', startDate).lt('date', endDate)
       .order('date', { ascending: false });
     if (memberId) q = q.eq('member_id', memberId);
 
