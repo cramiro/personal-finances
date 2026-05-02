@@ -117,12 +117,19 @@ export default function SummaryScreen() {
     let startDate: string, endDate: string;
     if (granularity === 'weekly') {
       startDate = getMondayKey(arDate(new Date(Date.now() - 7 * 7 * 86_400_000)));
-      endDate = arDate(new Date(Date.now() + 86_400_000)); // tomorrow in AR time (exclusive upper bound)
+      endDate = arDate(new Date(Date.now() + 86_400_000));
     } else {
-      const start = (from < to ? from : to);
-      const end   = (from < to ? to : from);
-      startDate = `${start}-01T00:00:00`;
-      const endD = new Date(`${end}-01`); endD.setMonth(endD.getMonth()+1);
+      let startMonth = from < to ? from : to;
+      const endMonth  = from < to ? to   : from;
+      // Single-period presets: silently load 3 extra prior months for average computation
+      if (preset === 'this-month' || preset === 'last-month') {
+        const [sy, sm] = startMonth.split('-').map(Number);
+        let py = sy, pm = sm - 3;
+        if (pm <= 0) { pm += 12; py--; }
+        startMonth = `${py}-${String(pm).padStart(2, '0')}`;
+      }
+      startDate = `${startMonth}-01T00:00:00`;
+      const endD = new Date(`${endMonth}-01`); endD.setMonth(endD.getMonth() + 1);
       endDate = endD.toISOString();
     }
 
@@ -136,7 +143,7 @@ export default function SummaryScreen() {
     const { data } = await q;
     setExpenses(data ?? []);
     setLoading(false);
-  }, [workspace, from, to, memberId, granularity]);
+  }, [workspace, from, to, memberId, granularity, preset]);
 
   useEffect(() => {
     load();
@@ -158,7 +165,15 @@ export default function SummaryScreen() {
 
   const displayCur: Currency = showUSD ? 'USD' : 'ARS';
 
-  // Pre-compute display amount per expense once — avoids O(n×3) calls per render
+  // For single-period presets we load extra prior months (for avg); filter them out for display
+  const periodExpenses = useMemo(() => {
+    if (preset === 'this-month' || preset === 'last-month') {
+      return expenses.filter(e => e.date.startsWith(from));
+    }
+    return expenses;
+  }, [expenses, preset, from]);
+
+  // Pre-compute display amount per expense once — covers ALL loaded expenses (incl. prior months for avg)
   const displayAmounts = useMemo(() => {
     const rate = blueRate?.venta ?? 1400;
     const map = new Map<string, number>();
@@ -173,8 +188,8 @@ export default function SummaryScreen() {
   }, [expenses, showUSD, blueRate?.venta]);
 
   const total = useMemo(
-    () => expenses.reduce((s, e) => s + (displayAmounts.get(e.id) ?? 0), 0),
-    [expenses, displayAmounts]
+    () => periodExpenses.reduce((s, e) => s + (displayAmounts.get(e.id) ?? 0), 0),
+    [periodExpenses, displayAmounts]
   );
 
   // Monthly chart range
@@ -197,7 +212,7 @@ export default function SummaryScreen() {
   const chartData = useMemo(() => {
     if (granularity === 'monthly') {
       const monthTotals: Record<string, number> = {};
-      expenses.forEach(e => {
+      periodExpenses.forEach(e => {
         const mo = e.date.slice(0, 7);
         monthTotals[mo] = (monthTotals[mo] ?? 0) + (displayAmounts.get(e.id) ?? 0);
       });
@@ -209,7 +224,7 @@ export default function SummaryScreen() {
     } else {
       const weeks8 = getWeeks8();
       const weekTotals: Record<string, number> = {};
-      expenses.forEach(e => {
+      periodExpenses.forEach(e => {
         const wk = getMondayKey(e.date);
         weekTotals[wk] = (weekTotals[wk] ?? 0) + (displayAmounts.get(e.id) ?? 0);
       });
@@ -219,15 +234,15 @@ export default function SummaryScreen() {
         total: Math.round(weekTotals[wk] ?? 0),
       }));
     }
-  }, [expenses, displayAmounts, range, granularity]);
+  }, [periodExpenses, displayAmounts, range, granularity]);
 
   // Category breakdown — key included to avoid reverse-lookup in render
   const breakdown = useMemo(() => {
     const src = selectedMonth
-      ? expenses.filter(e => granularity === 'weekly'
+      ? periodExpenses.filter(e => granularity === 'weekly'
           ? getMondayKey(e.date) === selectedMonth
           : e.date.startsWith(selectedMonth))
-      : expenses;
+      : periodExpenses;
     const catMap: Record<string, { name: string; color: string; total: number; key: string }> = {};
     src.forEach(e => {
       const cat = e.categories as any;
@@ -236,13 +251,35 @@ export default function SummaryScreen() {
       catMap[key].total += displayAmounts.get(e.id) ?? 0;
     });
     return Object.values(catMap).sort((a, b) => b.total - a.total);
-  }, [expenses, selectedMonth, displayAmounts, granularity]);
+  }, [periodExpenses, selectedMonth, displayAmounts, granularity]);
 
   const catPeriodLabel = selectedMonth
     ? (granularity === 'weekly'
         ? getWeekLabel(selectedMonth)
         : new Date(`${selectedMonth}-02T12:00:00Z`).toLocaleString('es-AR', { month: 'long', year: '2-digit' }).replace('.',''))
     : null;
+
+  // Average monthly spend — shown in total card for context
+  const avgData = useMemo((): { label: string; avg: number; delta: number | null } | null => {
+    // Single-period: avg from the 3 prior months loaded in background
+    if (preset === 'this-month' || preset === 'last-month') {
+      const priorExp = expenses.filter(e => !e.date.startsWith(from));
+      const priorMonths = new Set(priorExp.map(e => e.date.slice(0, 7)));
+      if (priorMonths.size === 0) return null;
+      const priorTotal = priorExp.reduce((s, e) => s + (displayAmounts.get(e.id) ?? 0), 0);
+      const avg = priorTotal / priorMonths.size;
+      const delta = avg > 0 ? (total - avg) / avg : null;
+      return { label: `Prom. ${priorMonths.size}m`, avg, delta };
+    }
+    // Multi-month: avg of complete months already loaded (exclude current partial month)
+    if (granularity === 'monthly' && chartData.length >= 2) {
+      const completeBars = chartData.filter(d => d.periodKey < MONTHS[0].value);
+      if (completeBars.length < 2) return null;
+      const avg = completeBars.reduce((s, d) => s + d.total, 0) / completeBars.length;
+      return { label: 'Prom. mensual', avg, delta: null };
+    }
+    return null;
+  }, [preset, expenses, from, displayAmounts, total, granularity, chartData]);
 
   return (
     <div className="wrap">
@@ -289,6 +326,16 @@ export default function SummaryScreen() {
                   ? `Ver en ARS · cotización $${blueRate.venta.toLocaleString('es-AR')}`
                   : `Ver en USD blue · ${formatAmount(total/blueRate.venta, 'USD')}`}
               </button>
+            )}
+            {avgData && (
+              <div className="avg-row">
+                <span className="avg-label">{avgData.label}: {formatAmount(Math.round(avgData.avg), displayCur)}</span>
+                {avgData.delta !== null && (
+                  <span className={`avg-delta ${avgData.delta > 0.005 ? 'avg-delta--up' : avgData.delta < -0.005 ? 'avg-delta--down' : 'avg-delta--flat'}`}>
+                    {avgData.delta > 0 ? '+' : ''}{Math.round(avgData.delta * 100)}%
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -379,10 +426,10 @@ export default function SummaryScreen() {
               catName={drillCat.name}
               catColor={drillCat.color}
               expenses={selectedMonth
-                ? expenses.filter(e => granularity === 'weekly'
+                ? periodExpenses.filter(e => granularity === 'weekly'
                     ? getMondayKey(e.date) === selectedMonth
                     : e.date.startsWith(selectedMonth))
-                : expenses}
+                : periodExpenses}
               toDisplay={toDisplay}
               displayCur={displayCur}
               isOwner={isOwner}
@@ -393,7 +440,7 @@ export default function SummaryScreen() {
             />
           )}
 
-          {expenses.length === 0 && <p className="empty">Sin gastos en este período</p>}
+          {periodExpenses.length === 0 && <p className="empty">Sin gastos en este período</p>}
         </>
       )}
 
@@ -414,6 +461,12 @@ export default function SummaryScreen() {
         .total-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
         .total-amount { font-size: 36px; font-weight: 800; color: var(--text); letter-spacing: -1.5px; line-height: 1; }
         .convert-btn { background: none; border: none; padding: 0; font-size: 13px; font-weight: 600; color: var(--primary); text-align: left; }
+        .avg-row { display: flex; align-items: center; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 2px; }
+        .avg-label { font-size: 12px; color: var(--text-secondary); flex: 1; }
+        .avg-delta { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; flex-shrink: 0; }
+        .avg-delta--up   { color: #C0392B; background: rgba(192,57,43,0.1); }
+        .avg-delta--down { color: #1D9E75; background: rgba(29,158,117,0.12); }
+        .avg-delta--flat { color: var(--text-tertiary); background: var(--bg); }
         .pills { display: flex; gap: 8px; flex-wrap: wrap; }
         .pill { border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--text-secondary); transition: all 0.15s; }
         .pill--active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
