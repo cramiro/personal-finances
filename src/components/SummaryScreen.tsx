@@ -457,26 +457,26 @@ export default function SummaryScreen() {
         .loading { display:flex;justify-content:center;padding:40px; }
         .spinner { width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.7s linear infinite; }
         @keyframes spin{to{transform:rotate(360deg)}}
-        .total-card { background: var(--surface); border-radius: 16px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 6px; }
+        .total-card { background: var(--surface); border-radius: 16px; padding: 20px; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 6px; }
         .total-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
         .total-amount { font-size: 36px; font-weight: 800; color: var(--text); letter-spacing: -1.5px; line-height: 1; }
         .convert-btn { background: none; border: none; padding: 0; font-size: 13px; font-weight: 600; color: var(--primary); text-align: left; }
         .avg-row { display: flex; align-items: center; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 2px; }
         .avg-label { font-size: 12px; color: var(--text-secondary); flex: 1; }
         .avg-delta { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 5px; flex-shrink: 0; }
-        .avg-delta--up   { color: #C0392B; background: rgba(192,57,43,0.1); }
-        .avg-delta--down { color: #1D9E75; background: rgba(29,158,117,0.12); }
+        .avg-delta--up   { color: var(--danger);  background: rgba(226,75,74,0.10); }
+        .avg-delta--down { color: var(--primary); background: rgba(29,158,117,0.12); }
         .avg-delta--flat { color: var(--text-tertiary); background: var(--bg); }
         .pills { display: flex; gap: 8px; flex-wrap: wrap; }
         .pill { border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--text-secondary); transition: all 0.15s; }
         .pill--active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
-        .chart-card { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .chart-card { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: var(--shadow-chart); }
         .chart-card :global(*:focus:not(:focus-visible)) { outline: none; }
-        .tt-box { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; min-width: 140px; }
+        .tt-box { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow-dropdown); cursor: pointer; min-width: 140px; }
         .tt-month { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.4px; margin: 0 0 2px; }
         .tt-total { font-size: 15px; font-weight: 800; color: var(--text); margin: 0 0 6px; }
         .tt-action { font-size: 12px; font-weight: 700; color: var(--primary); margin: 0; }
-        .section { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .section { background: var(--surface); border-radius: 16px; padding: 16px; box-shadow: var(--shadow-chart); }
         .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .section-label { font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
         .period-badge { border: none; background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; cursor: pointer; }
