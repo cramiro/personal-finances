@@ -107,7 +107,7 @@ export default function LandingPage() {
         <p className="footer-copy">Hecho con ♥ para el hogar argentino</p>
       </footer>
 
-      <style jsx>{`
+      <style jsx global>{`
         /* ─── Page shell ─────────────────────────────────── */
         .page {
           min-height: 100dvh;
