@@ -135,14 +135,14 @@ export default function LandingPage() {
         .nav-cta {
           font-size: 14px;
           font-weight: 600;
-          color: #F2F2F0;
+          color: #0E1117;
           text-decoration: none;
-          border: 1.5px solid rgba(255,255,255,0.2);
+          background: #FFFFFF;
           border-radius: 20px;
           padding: 7px 18px;
-          transition: border-color 0.15s;
+          transition: opacity 0.15s;
         }
-        .nav-cta:hover { border-color: rgba(255,255,255,0.5); }
+        .nav-cta:hover { opacity: 0.85; }
 
         /* ─── Hero ───────────────────────────────────────── */
         .hero {
@@ -179,8 +179,8 @@ export default function LandingPage() {
         }
         .cta-btn {
           display: inline-block;
-          background: var(--primary);
-          color: white;
+          background: #FFFFFF;
+          color: #0E1117;
           font-size: 16px;
           font-weight: 700;
           text-decoration: none;
@@ -188,7 +188,7 @@ export default function LandingPage() {
           padding: 15px 32px;
           transition: opacity 0.15s;
         }
-        .cta-btn:hover { opacity: 0.88; }
+        .cta-btn:hover { opacity: 0.85; }
 
         /* ─── Phone mockup ───────────────────────────────── */
         .mockup-wrap {
