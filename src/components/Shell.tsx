@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 
 const NAV = [
-  { href: '/', label: 'Cargar', icon: '⚡' },
+  { href: '/cargar', label: 'Cargar', icon: '⚡' },
   { href: '/resumen', label: 'Resumen', icon: '📊' },
   { href: '/config', label: 'Config', icon: '⚙️' },
 ];
