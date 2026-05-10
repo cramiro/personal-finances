@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gastly — UI Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #111827;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100dvh;
+    padding: 24px;
+  }
+  #root {
+    width: 390px;
+    height: min(844px, calc(100dvh - 48px));
+    background: #FAFAF8;
+    border-radius: 44px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 30px 80px rgba(0,0,0,0.7);
+    position: relative;
+    flex-shrink: 0;
+  }
+  @media (max-width: 480px) {
+    body { padding: 0; align-items: flex-start; }
+    #root { width: 100%; height: 100dvh; border-radius: 0; box-shadow: none; }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="AppShell.jsx"></script>
+<script type="text/babel" src="AuthScreen.jsx"></script>
+<script type="text/babel" src="HomeScreen.jsx"></script>
+<script type="text/babel" src="SummaryScreen.jsx"></script>
+<script type="text/babel" src="ConfigScreen.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+
+function App() {
+  const [auth, setAuth]     = useState(true);
+  const [screen, setScreen] = useState('home');
+  const { Shell, AuthScreen, HomeScreen, SummaryScreen, ConfigScreen, MEMBERS } = window;
+  const member = MEMBERS[0];
+
+  if (!auth) {
+    return <AuthScreen onAuth={() => { setAuth(true); setScreen('home'); }} />;
+  }
+
+  return (
+    <Shell screen={screen} onNav={setScreen} member={member} onLogout={() => setAuth(false)}>
+      {screen === 'home'    && <HomeScreen    member={member} />}
+      {screen === 'summary' && <SummaryScreen />}
+      {screen === 'config'  && <ConfigScreen  member={member} />}
+    </Shell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

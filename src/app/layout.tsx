@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AppProvider } from '@/context/AppContext';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gastly.vercel.app';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app-gastly.vercel.app';
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
