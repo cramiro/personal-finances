@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 const FEATURES = [
   {
@@ -25,6 +27,16 @@ const FEATURES = [
 ];
 
 export default function LandingPage() {
+  const router = useRouter();
+
+  // When opened as a PWA (Add to Home Screen), skip the landing and go straight to the app.
+  // AppGate at /cargar handles auth: shows login if not authenticated, app if authenticated.
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      router.replace('/cargar');
+    }
+  }, [router]);
+
   return (
     <div className="page">
       {/* Nav */}
