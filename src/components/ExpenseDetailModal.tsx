@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import posthog from 'posthog-js';
 import { supabase } from '@/lib/supabase';
 import { getDailyRate } from '@/lib/blueRate';
 import { formatAmount } from '@/lib/parser';
@@ -43,12 +44,14 @@ export default function ExpenseDetailModal({ expense, categories, isOwner, displ
       amount_usd,
     }).eq('id', expense.id);
     setSaving(false);
+    posthog.capture('expense_edited', { amount: num, currency });
     onSaved();
   }
 
   async function handleDelete() {
     if (!confirm('¿Eliminar este gasto?')) return;
     await supabase.from('expenses').delete().eq('id', expense.id);
+    posthog.capture('expense_deleted');
     onDeleted();
   }
 
@@ -80,6 +83,7 @@ export default function ExpenseDetailModal({ expense, categories, isOwner, displ
                 className={`btn-recurring ${addedAsRecurring ? 'btn-recurring--done' : ''}`}
                 onClick={async () => {
                   await onAddAsRecurring(expense);
+                  posthog.capture('expense_added_to_recurring', { description: expense.description });
                   setAddedAsRecurring(true);
                 }}
                 disabled={addedAsRecurring}

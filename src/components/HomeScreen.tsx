@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import posthog from 'posthog-js';
 import { useApp } from '@/context/AppContext';
 import { parseExpense, formatAmount } from '@/lib/parser';
 import { supabase } from '@/lib/supabase';
@@ -100,6 +101,11 @@ export default function HomeScreen() {
     });
     setSaving(false);
     if (!error) {
+      posthog.capture('expense_added', {
+        amount: parsed.amount,
+        currency: parsed.currency,
+        category_overridden: !!overrideCategoryId,
+      });
       setInput('');
       setOverrideCategoryId(null);
       setSavedMsg(true);
@@ -173,7 +179,7 @@ export default function HomeScreen() {
           categories={categories}
           workspaceId={workspace.id}
           selectedId={activeCategoryId}
-          onSelect={id => { setOverrideCategoryId(id); setShowCatPicker(false); }}
+          onSelect={id => { posthog.capture('expense_category_overridden'); setOverrideCategoryId(id); setShowCatPicker(false); }}
           onCreated={async id => { await reloadCategories(); setOverrideCategoryId(id); setShowCatPicker(false); }}
           onClose={() => setShowCatPicker(false)}
         />
@@ -310,10 +316,14 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
     if (currentlyPaid && check) {
       setChecks(prev => prev.filter(c => c.id !== check.id));
       await supabase.from('recurring_checks').delete().eq('id', check.id);
+      posthog.capture('recurring_check_toggled', { template_name: t.name, checked: false });
     } else if (!currentlyPaid) {
       const payload = { workspace_id: workspaceId, template_id: t.id, year_month: currentMonth, checked_by: currentMember.id };
       const { data } = await supabase.from('recurring_checks').insert(payload).select().single();
-      if (data) setChecks(prev => [...prev, data]);
+      if (data) {
+        setChecks(prev => [...prev, data]);
+        posthog.capture('recurring_check_toggled', { template_name: t.name, checked: true });
+      }
     }
   }
 
@@ -425,6 +435,7 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
         name,
       }).select().single();
       if (!error && data) {
+        posthog.capture('shopping_item_added');
         setNewItem('');
         // Prepend to local state instead of refetching — avoids overwriting
         // optimistic completed_at updates from toggleItem (fire-and-forget)
@@ -455,6 +466,7 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     const ids = completed.map(i => i.id);
     if (ids.length === 0) return;
     await supabase.from('shopping_items').delete().in('id', ids);
+    posthog.capture('shopping_list_cleared', { items_cleared: ids.length });
     loadItems();
   }
 
@@ -578,7 +590,10 @@ function CategoryPickerSheet({ categories, workspaceId, selectedId, onSelect, on
       .select()
       .single();
     setSaving(false);
-    if (data) await onCreated(data.id);
+    if (data) {
+      posthog.capture('category_created', { category_name: data.name, source: 'expense_picker' });
+      await onCreated(data.id);
+    }
   }
 
   return (

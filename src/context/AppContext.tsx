@@ -1,5 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import posthog from 'posthog-js';
 import { supabase } from '@/lib/supabase';
 import { Workspace, Member, Category, BlueRate, Currency } from '@/types';
 import { getBlueRate } from '@/lib/blueRate';
@@ -140,6 +141,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
+    posthog.identify(data.user.id, { email: data.user.email });
+    posthog.capture('user_logged_in', { email: data.user.email });
     await loadUserData(data.user.id);
   }
 
@@ -147,10 +150,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error('No se pudo crear el usuario');
+    posthog.identify(data.user.id, { email: data.user.email });
+    posthog.capture('user_signed_up', { email: data.user.email });
     setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
   }
 
   async function logout() {
+    posthog.reset();
     await supabase.auth.signOut();
     localStorage.removeItem(WS_KEY);
     localStorage.removeItem(MEM_KEY);
@@ -180,6 +186,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem(WS_KEY, ws.id);
     localStorage.setItem(MEM_KEY, member.id);
+
+    posthog.capture('workspace_created', { workspace_name: ws.name, default_currency: currency });
 
     const blue = await getBlueRate();
     setState(s => ({ ...s, workspace: ws, currentMember: member, members: [member], categories: cats ?? [], blueRate: blue }));
@@ -222,6 +230,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem(WS_KEY, invite.workspace_id);
     localStorage.setItem(MEM_KEY, member.id);
+
+    posthog.capture('workspace_joined', { workspace_id: invite.workspace_id });
+
     setState(s => ({ ...s, workspace: ws, currentMember: member, members: mems ?? [], categories: cats ?? [], blueRate: blue }));
   }
 

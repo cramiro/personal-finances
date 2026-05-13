@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import posthog from 'posthog-js';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 import { Category, Invite, RecurringTemplate } from '@/types';
@@ -101,6 +102,7 @@ function GeneralTab() {
       .from('invites')
       .insert({ workspace_id: workspace.id, created_by: currentMember.user_id })
       .select().single();
+    if (data) posthog.capture('invite_generated');
     setInvite(data ?? null);
     setGenerating(false);
   }
@@ -409,6 +411,7 @@ function CategoriesTab() {
       catId = data?.id ?? '';
     }
     await reloadCategories();
+    posthog.capture('category_saved', { category_name: name.trim(), is_new: !editing, keyword_count: kws.length });
     setSavedCat({ id: catId, name: name.trim(), keywords: kws });
     setReprocessResult(null);
   }
