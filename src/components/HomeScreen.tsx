@@ -403,6 +403,18 @@ function RecurringSection({ workspaceId, currentMember, members, categories, ref
   );
 }
 
+const RECENT_KEY = (wsId: string) => `gastly_shop_recent_${wsId}`;
+const MAX_RECENT = 8;
+
+function getRecent(wsId: string): string[] {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY(wsId)) ?? '[]'); } catch { return []; }
+}
+function saveRecent(wsId: string, added: string[]) {
+  const prev = getRecent(wsId);
+  const merged = [...added, ...prev.filter(r => !added.includes(r))].slice(0, MAX_RECENT);
+  localStorage.setItem(RECENT_KEY(wsId), JSON.stringify(merged));
+}
+
 function ShoppingListSection({ workspaceId, currentMember, members }: {
   workspaceId: string;
   currentMember: Member;
@@ -412,6 +424,8 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [newItem, setNewItem] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
 
   const loadItems = useCallback(async () => {
     const { data } = await supabase
@@ -423,27 +437,32 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
   }, [workspaceId]);
 
   useEffect(() => { loadItems(); }, [loadItems]);
+  useEffect(() => { setRecent(getRecent(workspaceId)); }, [workspaceId]);
 
-  async function addItem() {
-    const name = newItem.trim();
-    if (!name) return;
+  // Layer 1: bulk add — parse comma-separated or newline-separated input
+  async function addItems(raw: string) {
+    const names = raw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+    if (names.length === 0) return;
     setSaving(true);
     try {
-      const { data, error } = await supabase.from('shopping_items').insert({
-        workspace_id: workspaceId,
-        created_by: currentMember.id,
-        name,
-      }).select().single();
+      const rows = names.map(name => ({ workspace_id: workspaceId, created_by: currentMember.id, name }));
+      const { data, error } = await supabase.from('shopping_items').insert(rows).select();
       if (!error && data) {
-        posthog.capture('shopping_item_added');
+        posthog.capture('shopping_item_added', { count: names.length, bulk: names.length > 1 });
         setNewItem('');
-        // Prepend to local state instead of refetching — avoids overwriting
-        // optimistic completed_at updates from toggleItem (fire-and-forget)
-        setItems(prev => [data, ...prev]);
+        setItems(prev => [...data.reverse(), ...prev]);
+        // Layer 2: update recent chips
+        saveRecent(workspaceId, names);
+        setRecent(getRecent(workspaceId));
       }
     } finally {
       setSaving(false);
     }
+  }
+
+  // Layer 2: quick-add from chip (single item, no parsing needed)
+  async function addQuickItem(name: string) {
+    await addItems(name);
   }
 
   async function toggleItem(item: ShoppingItem) {
@@ -451,9 +470,7 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     const patch = item.completed_at
       ? { completed_at: null, completed_by: null }
       : { completed_at: now, completed_by: currentMember.id };
-    // Optimistic update — UI responds instantly, no need to refetch
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...patch } : i));
-    // Persist in background
     supabase.from('shopping_items').update(patch).eq('id', item.id);
   }
 
@@ -470,6 +487,23 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     loadItems();
   }
 
+  // Layer 3: share list via Web Share API or clipboard fallback
+  async function shareList() {
+    const pendingLines = pending.map(i => `◻ ${i.name}`).join('\n');
+    const completedLines = completed.map(i => `✓ ${i.name}`).join('\n');
+    const parts = ['📋 Lista de compras'];
+    if (pendingLines) parts.push(pendingLines);
+    if (completedLines) parts.push(completedLines);
+    const text = parts.join('\n\n');
+    if (navigator.share) {
+      navigator.share({ text }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
   function memberName(id: string | null) {
     if (!id) return '?';
     return members.find(m => m.id === id)?.display_name ?? '?';
@@ -480,6 +514,10 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
     completed: items.filter(i =>  i.completed_at),
   }), [items]);
 
+  // Recent chips that aren't already pending (no duplicates in list)
+  const pendingNames = useMemo(() => new Set(pending.map(i => i.name.toLowerCase())), [pending]);
+  const recentChips = recent.filter(r => !pendingNames.has(r.toLowerCase()));
+
   return (
     <>
       <button className="shop-toggle" onClick={() => setOpen(v => !v)}>
@@ -487,23 +525,54 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
           Lista de compras
           {pending.length > 0 && <span className="shop-badge">{pending.length}</span>}
         </span>
-        <svg className={`shop-chevron ${open ? 'shop-chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        <div className="shop-toggle-right">
+          {/* Layer 3: share button — visible even when collapsed */}
+          {items.length > 0 && (
+            <button
+              className="shop-share-btn"
+              onClick={e => { e.stopPropagation(); shareList(); }}
+              title={copied ? '¡Copiado!' : 'Compartir lista'}
+            >
+              {copied ? '✓' : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+              )}
+            </button>
+          )}
+          <svg className={`shop-chevron ${open ? 'shop-chevron--up' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
       </button>
 
       {open && (
         <div className="shop-panel">
+          {/* Layer 1: bulk input */}
           <div className="shop-add">
             <input
               className="shop-input"
-              placeholder="Agregar ítem..."
+              placeholder="leche, pan, fideos..."
               value={newItem}
               onChange={e => setNewItem(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItems(newItem); } }}
             />
-            <button type="button" className="shop-add-btn" onClick={addItem} disabled={saving || !newItem.trim()}>→</button>
+            <button type="button" className="shop-add-btn" onClick={() => addItems(newItem)} disabled={saving || !newItem.trim()}>
+              Agregar
+            </button>
           </div>
+
+          {/* Layer 2: recent chips */}
+          {recentChips.length > 0 && (
+            <div className="shop-chips">
+              {recentChips.map(name => (
+                <button key={name} className="shop-chip" onClick={() => addQuickItem(name)}>
+                  + {name}
+                </button>
+              ))}
+            </div>
+          )}
 
           {items.length === 0 && <p className="shop-empty">La lista está vacía</p>}
 
@@ -540,15 +609,21 @@ function ShoppingListSection({ workspaceId, currentMember, members }: {
       <style jsx>{`
         .shop-toggle { display: flex; align-items: center; justify-content: space-between; background: none; border: none; padding: 4px 0; cursor: pointer; width: 100%; }
         .shop-toggle-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .shop-toggle-right { display: flex; align-items: center; gap: 8px; }
+        .shop-share-btn { background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 4px; display: flex; align-items: center; font-size: 13px; font-weight: 700; transition: color 0.15s; }
+        .shop-share-btn:hover { color: var(--primary); }
         .shop-chevron { color: var(--text-tertiary); transition: transform 0.2s; flex-shrink: 0; }
         .shop-chevron--up { transform: rotate(180deg); }
         .shop-badge { background: var(--primary); color: white; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; line-height: 1.6; }
         .shop-panel { background: var(--surface); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }
-        .shop-add { display: flex; gap: 8px; margin-bottom: 8px; }
+        .shop-add { display: flex; gap: 8px; margin-bottom: 6px; }
         .shop-input { flex: 1; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 16px; color: var(--text); background: var(--surface); font-family: inherit; }
         .shop-input:focus { border-color: var(--primary); outline: none; }
-        .shop-add-btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 14px; font-size: 18px; font-weight: 700; cursor: pointer; }
+        .shop-add-btn { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .shop-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .shop-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .shop-chip { background: none; border: 1.5px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+        .shop-chip:active { border-color: var(--primary); color: var(--primary); }
         .shop-empty { font-size: 13px; color: var(--text-tertiary); text-align: center; padding: 16px 0 8px; margin: 0; }
         .shop-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
         .shop-item--done { opacity: 0.5; }
