@@ -7,14 +7,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app-gastly.vercel.
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: 'Gastly — Trackeo de gastos del hogar',
-  description: 'Sabé en qué gastás, sin que sea un trabajo. Registro de gastos compartido para parejas argentinas.',
+  description: 'Sabé en qué gastás, sin que sea un trabajo. Registro de gastos compartido para hogares argentinos.',
   applicationName: 'Gastly',
   openGraph: {
     type: 'website',
     url: BASE_URL,
     siteName: 'Gastly',
     title: 'Gastly — Trackeo de gastos del hogar',
-    description: 'Sabé en qué gastás, sin que sea un trabajo. Registro compartido para parejas argentinas.',
+    description: 'Sabé en qué gastás, sin que sea un trabajo. Registro compartido para hogares argentinos.',
     images: [{ url: '/opengraph-image.png', width: 1200, height: 630 }],
   },
   twitter: {

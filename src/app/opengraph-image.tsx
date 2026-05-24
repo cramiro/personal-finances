@@ -56,7 +56,7 @@ export default function OGImage() {
             fontFamily: 'sans-serif',
           }}
         >
-          Registro de gastos del hogar para parejas argentinas
+          Registro de gastos del hogar para hogares argentinos
         </div>
 
         {/* Accent dot */}

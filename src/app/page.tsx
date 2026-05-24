@@ -48,7 +48,7 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="hero">
         <div className="hero-inner">
-          <p className="hero-eyebrow">Para parejas argentinas</p>
+          <p className="hero-eyebrow">Para hogares argentinos</p>
           <h1 className="hero-title">
             Sabé en qué<br />gastás, sin que<br />sea un trabajo.
           </h1>
