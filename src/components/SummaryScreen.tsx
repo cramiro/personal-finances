@@ -49,17 +49,7 @@ function getWeekLabel(mondayKey: string): string {
   return d.toLocaleString('es-AR', { day: 'numeric', month: 'short' }).replace('.', '');
 }
 
-// --- Preset chips ---
 type Preset = 'this-week' | 'last-week' | 'this-month' | 'last-month' | '3-months' | 'ytd' | 'custom';
-const PRESET_LABELS: Record<Preset, string> = {
-  'this-week':  'Esta sem.',
-  'last-week':  'Sem. ant.',
-  'this-month': 'Este mes',
-  'last-month': 'Mes ant.',
-  '3-months':   '3 meses',
-  'ytd':        'Este año',
-  'custom':     '···',
-};
 
 function fmtShort(value: number, cur: Currency): string {
   if (cur === 'USD') {
@@ -283,18 +273,20 @@ export default function SummaryScreen() {
 
   return (
     <div className="wrap">
-      {/* Preset chips */}
-      <div className="preset-row">
-        {(Object.keys(PRESET_LABELS) as Preset[]).map(p => (
-          <button
-            key={p}
-            className={`preset-chip ${preset === p ? 'preset-chip--active' : ''}`}
-            onClick={() => applyPreset(p)}
-          >
-            {PRESET_LABELS[p]}
-          </button>
-        ))}
-      </div>
+      {/* Period dropdown */}
+      <select
+        className="period-select"
+        value={preset}
+        onChange={e => applyPreset(e.target.value as Preset)}
+      >
+        <option value="this-week">Esta semana</option>
+        <option value="last-week">Semana anterior</option>
+        <option value="this-month">Este mes</option>
+        <option value="last-month">Mes anterior</option>
+        <option value="3-months">Últimos 3 meses</option>
+        <option value="ytd">Este año</option>
+        <option value="custom">Personalizado</option>
+      </select>
 
       {/* Custom: granularity toggle + manual selectors */}
       {preset === 'custom' && (
@@ -446,10 +438,8 @@ export default function SummaryScreen() {
 
       <style jsx>{`
         .wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-        .preset-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-        .preset-row::-webkit-scrollbar { display: none; }
-        .preset-chip { flex-shrink: 0; padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 20px; font-size: 13px; font-weight: 600; background: var(--surface); color: var(--text-secondary); cursor: pointer; white-space: nowrap; transition: all 0.15s; }
-        .preset-chip--active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+        .period-select { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 13px 14px; font-size: 16px; font-weight: 600; color: var(--text); background: var(--surface); cursor: pointer; }
+        .period-select:focus { border-color: var(--primary); outline: none; }
         .gran-toggle { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; }
         .gran-btn { flex: 1; padding: 9px; border: none; background: none; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
         .gran-btn--active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
