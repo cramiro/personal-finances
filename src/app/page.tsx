@@ -1,7 +1,21 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const IOS_STEPS = [
+  'Abrí esta página en Safari (no en Chrome ni otro browser)',
+  'Tocá el botón Compartir ↑ en la barra inferior de Safari',
+  'Seleccioná "Agregar a inicio"',
+  'Tocá "Agregar" para confirmar',
+];
+
+const ANDROID_STEPS = [
+  'Abrí esta página en Chrome',
+  'Tocá el menú ⋮ en la esquina superior derecha',
+  'Seleccioná "Agregar a pantalla de inicio"',
+  'Tocá "Agregar" para confirmar',
+];
 
 const FEATURES = [
   {
@@ -28,6 +42,9 @@ const FEATURES = [
 
 export default function LandingPage() {
   const router = useRouter();
+  const installRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'ios' | 'android'>('ios');
+  const [showBanner, setShowBanner] = useState(false);
 
   // When opened as a PWA (Add to Home Screen), skip the landing and go straight to the app.
   // AppGate at /cargar handles auth: shows login if not authenticated, app if authenticated.
@@ -36,6 +53,22 @@ export default function LandingPage() {
       router.replace('/cargar');
     }
   }, [router]);
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/.test(ua);
+    const isAndroid = /Android/.test(ua);
+    if (isIOS) setActiveTab('ios');
+    else if (isAndroid) setActiveTab('android');
+    if ((isIOS || isAndroid) && !localStorage.getItem('gastly_install_dismissed')) {
+      setShowBanner(true);
+    }
+  }, []);
+
+  function dismissBanner() {
+    setShowBanner(false);
+    localStorage.setItem('gastly_install_dismissed', '1');
+  }
 
   return (
     <div className="page">
@@ -106,6 +139,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Install */}
+      <section className="install" ref={installRef}>
+        <p className="section-label">INSTALACIÓN</p>
+        <h2 className="install-title">Tres pasos y la tenés<br />en tu pantalla de inicio</h2>
+        <div className="install-card">
+          <div className="install-tabs">
+            <button
+              className={`install-tab ${activeTab === 'ios' ? 'install-tab--active' : ''}`}
+              onClick={() => setActiveTab('ios')}
+            >
+              iPhone / iPad
+            </button>
+            <button
+              className={`install-tab ${activeTab === 'android' ? 'install-tab--active' : ''}`}
+              onClick={() => setActiveTab('android')}
+            >
+              Android
+            </button>
+          </div>
+          <div className="install-steps">
+            {(activeTab === 'ios' ? IOS_STEPS : ANDROID_STEPS).map((step, i) => (
+              <div key={i} className="install-step">
+                <span className="step-num">{i + 1}</span>
+                <span className="step-text">{step}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA bottom */}
       <section className="bottom-cta">
         <h2 className="bottom-cta-title">Empezá hoy</h2>
@@ -118,6 +181,24 @@ export default function LandingPage() {
         <span className="footer-logo">gastly</span>
         <p className="footer-copy">Hecho con ♥ para el hogar argentino</p>
       </footer>
+
+      {/* Install banner (mobile only, dismissed via localStorage) */}
+      {showBanner && (
+        <div className="install-banner">
+          <span className="banner-emoji">📲</span>
+          <span className="banner-text">Agregá Gastly a tu pantalla de inicio</span>
+          <button
+            className="banner-cta"
+            onClick={() => {
+              installRef.current?.scrollIntoView({ behavior: 'smooth' });
+              setShowBanner(false);
+            }}
+          >
+            Ver cómo →
+          </button>
+          <button className="banner-close" onClick={dismissBanner}>✕</button>
+        </div>
+      )}
 
       <style jsx global>{`
         /* ─── Page shell ─────────────────────────────────── */
@@ -393,6 +474,25 @@ export default function LandingPage() {
           color: #5A5A5A;
           margin: 0;
         }
+
+        /* ─── Install ───────────────────────────────────── */
+        .install { max-width: 1080px; margin: 0 auto; padding: 0 24px 80px; }
+        .install-title { font-size: clamp(24px, 3vw, 36px); font-weight: 800; letter-spacing: -1px; color: #F2F2F0; margin: 0 0 28px; line-height: 1.15; }
+        .install-card { max-width: 420px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; }
+        .install-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+        .install-tab { flex: 1; padding: 10px 8px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background: none; color: #6B6B6B; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .install-tab--active { background: var(--primary); border-color: var(--primary); color: white; }
+        .install-steps { display: flex; flex-direction: column; gap: 16px; }
+        .install-step { display: flex; align-items: flex-start; gap: 14px; }
+        .step-num { width: 26px; height: 26px; border-radius: 50%; background: rgba(29,158,117,0.15); color: var(--primary); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+        .step-text { font-size: 14px; line-height: 1.5; color: #C0C0BE; }
+
+        /* ─── Install banner ─────────────────────────────── */
+        .install-banner { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; background: rgba(14,17,23,0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid rgba(29,158,117,0.25); padding: 14px 20px; display: flex; align-items: center; gap: 10px; }
+        .banner-emoji { font-size: 20px; flex-shrink: 0; }
+        .banner-text { flex: 1; font-size: 14px; font-weight: 600; color: #F2F2F0; line-height: 1.3; }
+        .banner-cta { font-size: 13px; font-weight: 700; color: var(--primary); background: none; border: none; cursor: pointer; white-space: nowrap; padding: 0; }
+        .banner-close { font-size: 16px; color: #5A5A5A; background: none; border: none; cursor: pointer; padding: 4px; flex-shrink: 0; }
 
         /* ─── Responsive ─────────────────────────────────── */
         @media (max-width: 700px) {
