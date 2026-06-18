@@ -14,7 +14,7 @@ export async function getBlueRate(): Promise<BlueRate> {
     }
   }
   try {
-    const res = await fetch('https://dolarapi.com/v1/dolares/blue');
+    const res = await fetch('https://dolarapi.com/v1/dolares/blue', { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error('api error');
     const json = await res.json();
     const rate: BlueRate = { compra: json.compra, venta: json.venta, fetchedAt: new Date().toISOString() };

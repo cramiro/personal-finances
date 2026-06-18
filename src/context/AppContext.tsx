@@ -57,7 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function loadUserData(userId: string) {
     // Always look up the member by user_id from the DB (works across devices)
-    const { data: member } = await supabase
+    const { data: member, error: memberError } = await supabase
       .from('members')
       .select('*')
       .eq('user_id', userId)
@@ -66,7 +66,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (!member) {
-      setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
+      if (memberError) {
+        // Query failed (RLS recursion, network, etc.) — sign out to login screen
+        // rather than showing SetupScreen as if the user has no workspace.
+        await supabase.auth.signOut();
+        setState(s => ({ ...s, isAuthenticated: false, isLoading: false }));
+      } else {
+        // Authenticated but genuinely no workspace yet → SetupScreen
+        setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
+      }
       return;
     }
 
