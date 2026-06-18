@@ -26,6 +26,7 @@ interface AppCtx extends AppState {
   logout: () => Promise<void>;
   setupWorkspace: (name: string, displayName: string, currency: 'ARS' | 'USD') => Promise<void>;
   joinWorkspace: (code: string, displayName: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   reloadCategories: () => Promise<void>;
   reloadMembers: () => Promise<void>;
   refreshBlueRate: () => Promise<void>;
@@ -302,6 +303,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(s => s.workspace ? { ...s, workspace: { ...s.workspace, default_currency: currency } } : s);
   }
 
+  async function resetPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app-gastly.vercel.app'}/reset-password`,
+    });
+    if (error) throw new Error(error.message);
+  }
+
   async function refreshBlueRate() {
     const blue = await getBlueRate();
     setState(s => {
@@ -314,7 +322,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       ...state,
       hasWorkspace: !!state.workspace,
-      login, register, logout,
+      login, register, logout, resetPassword,
       setupWorkspace, joinWorkspace, reloadCategories, reloadMembers, refreshBlueRate, setShoppingListEnabled, setRecurringEnabled, updateWorkspaceName, updateDefaultCurrency,
     }}>
       {children}

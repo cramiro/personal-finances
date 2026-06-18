@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 
 type Step = 'email' | 'pin' | 'confirm';
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | 'forgot';
 
 const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
@@ -12,13 +12,14 @@ function isValidEmail(e: string) {
 }
 
 export default function AuthScreen() {
-  const { login, register } = useApp();
+  const { login, register, resetPassword } = useApp();
   const [step, setStep]     = useState<Step>('email');
   const [mode, setMode]     = useState<Mode>('login');
   const [email, setEmail]   = useState('');
   const [pin, setPin]       = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const firstPinRef         = useRef('');
 
   // Auto-submit when PIN reaches 6 digits
@@ -81,6 +82,21 @@ export default function AuthScreen() {
     }
   }
 
+  async function handleResetPassword() {
+    if (!isValidEmail(email)) return;
+    setLoading(true);
+    setError('');
+    try {
+      await resetPassword(email.trim());
+      setResetSent(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      setError(msg || 'Error al enviar el email');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function goBack() {
     setStep('email');
     setPin('');
@@ -97,6 +113,76 @@ export default function AuthScreen() {
     step === 'confirm'    ? 'Confirmá tu PIN' :
     mode  === 'login'     ? 'Ingresá tu PIN' :
                             'Elegí un PIN de 6 dígitos';
+
+  if (mode === 'forgot') {
+    return (
+      <div className="wrap">
+        <div className="header">
+          <h1 className="logo">gastly</h1>
+          <p className="subtitle">La forma más rápida de trackear gastos</p>
+        </div>
+
+        {resetSent ? (
+          <div className="form">
+            <div className="success-block">
+              <div className="success-icon">✓</div>
+              <p className="success-title">Revisá tu email</p>
+              <p className="success-body">Te mandamos un link para resetear tu PIN a <strong>{email}</strong>.</p>
+            </div>
+            <button className="btn" onClick={() => { setMode('login'); setResetSent(false); setError(''); }}>
+              Volver al inicio
+            </button>
+          </div>
+        ) : (
+          <div className="form">
+            <button className="back-btn-inline" onClick={() => { setMode('login'); setError(''); }}>← volver</button>
+            <div className="field">
+              <label className="label">Email de tu cuenta</label>
+              <input
+                className="input"
+                type="email"
+                inputMode="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={e => { setEmail(e.target.value); setError(''); }}
+                onKeyDown={e => { if (e.key === 'Enter' && isValidEmail(email)) handleResetPassword(); }}
+                autoComplete="email"
+                autoFocus
+              />
+            </div>
+            {error && <p className="error">{error}</p>}
+            <button
+              className="btn"
+              onClick={handleResetPassword}
+              disabled={!isValidEmail(email) || loading}
+            >
+              {loading ? 'Enviando...' : 'Enviar link de reseteo'}
+            </button>
+          </div>
+        )}
+
+        <style jsx>{`
+          .wrap { min-height: 100dvh; max-width: 480px; margin: 0 auto; padding: 64px 24px 32px; background: var(--bg); display: flex; flex-direction: column; }
+          .header { text-align: center; margin-bottom: 48px; }
+          .logo { font-size: 40px; font-weight: 800; color: var(--primary); letter-spacing: -1.5px; margin: 0 0 8px; }
+          .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0; }
+          .form { display: flex; flex-direction: column; gap: 16px; }
+          .back-btn-inline { background: none; border: none; color: var(--text-secondary); font-size: 14px; font-weight: 600; padding: 0; cursor: pointer; align-self: flex-start; }
+          .field { display: flex; flex-direction: column; gap: 6px; }
+          .label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+          .input { border: 1.5px solid var(--border); border-radius: 10px; padding: 13px 14px; font-size: 16px; color: var(--text); background: var(--surface); transition: border-color 0.15s; }
+          .input:focus { border-color: var(--primary); outline: none; }
+          .btn { background: var(--primary); color: white; border: none; border-radius: 12px; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+          .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+          .error { color: var(--danger); font-size: 13px; margin: 0; }
+          .success-block { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 0 16px; text-align: center; }
+          .success-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--primary-light); color: var(--primary); font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+          .success-title { font-size: 20px; font-weight: 700; color: var(--text); margin: 0; }
+          .success-body { font-size: 14px; color: var(--text-secondary); margin: 0; line-height: 1.5; }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="wrap">
@@ -136,6 +222,11 @@ export default function AuthScreen() {
           >
             {mode === 'login' ? 'Crear cuenta' : 'Ya tengo cuenta'}
           </button>
+          {mode === 'login' && (
+            <button className="forgot-btn" onClick={() => { setMode('forgot'); setError(''); }}>
+              ¿Olvidaste tu PIN?
+            </button>
+          )}
         </div>
       ) : (
         <div className="pin-wrap">
@@ -198,6 +289,7 @@ export default function AuthScreen() {
         .btn { background: var(--primary); color: white; border: none; border-radius: 12px; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn--secondary { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
+        .forgot-btn { background: none; border: none; color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; text-align: center; }
         .error-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .recovery-btn { background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
         /* pin step */
