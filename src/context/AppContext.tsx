@@ -305,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function resetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app-gastly.vercel.app'}/reset-password`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gastly.ar'}/reset-password`,
     });
     if (error) throw new Error(error.message);
   }
