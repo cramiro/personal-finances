@@ -89,6 +89,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       getBlueRate(),
     ]);
 
+    if (!ws) {
+      // Workspace query failed (RLS, network, PGRST116) — sign out to login
+      // rather than showing SetupScreen as if the user has no workspace.
+      await supabase.auth.signOut();
+      setState(s => ({ ...s, isAuthenticated: false, isLoading: false }));
+      return;
+    }
+
     setState({
       workspace: ws, currentMember: member, members: mems ?? [],
       categories: cats ?? [], blueRate: blue,
